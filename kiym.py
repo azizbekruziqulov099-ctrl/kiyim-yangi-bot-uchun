@@ -155,7 +155,9 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
 
-    print(update.message.photo[-1].file_id)
+file_id = update.message.photo[-1].file_id
+
+await update.message.reply_text(file_id)
 
     context.user_data["photo"] = update.message.photo[-1].file_id
     context.user_data["step"] = "gender"
