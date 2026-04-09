@@ -630,10 +630,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for idx, item in cart.items():
             if now - item["time"] < 7200:
-                new_cart[idx] = item
+                new_cart[int(idx)] = item
             else:
-                products[int(idx)]["reserved"] -= item["qty"]
-
+                products[int(idx)]["reserved"] = max(
+                    0,
+                    products[int(idx)].get("reserved", 0) - item["qty"]
+                )
         carts[user_id] = new_cart
         cart = new_cart
         save_products()
@@ -943,7 +945,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             carts[user_id] = {}
 
         import time
-
+        idx = int(idx)
         if idx not in carts[user_id]:
             carts[user_id][idx] = {
                 "qty": 1,
@@ -1132,6 +1134,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=user_id,
             text="❌ Buyurtmangiz bekor qilindi"
         )
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=f"❌ BUYURTMA BEKOR QILINDI\nID: {order_id}"
+        )
 
         orders.pop(order_id)
         save_orders()
@@ -1315,9 +1321,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for idx, item in cart.items():
             if now - item["time"] < 7200:
-                new_cart[idx] = item
+                new_cart[int(idx)] = item
             else:
-                products[int(idx)]["reserved"] -= item["qty"]
+                products[int(idx)]["reserved"] = max(
+                    0,
+                    products[int(idx)].get("reserved", 0) - item["qty"]
+                )
 
         carts[user_id] = new_cart
         cart = new_cart
@@ -1361,7 +1370,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🔙 Orqaga", callback_data="back")
         ])
 
-        await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data.startswith("del_"):
         idx = int(data.split("_")[1])
@@ -1371,7 +1380,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if idx in cart:
             qty = cart[idx]["qty"]
-            products[idx]["reserved"] -= qty
+            products[idx]["reserved"] = max(
+                0,
+                products[idx].get("reserved", 0) - qty
+            )
             cart.pop(idx)
 
             save_products()
