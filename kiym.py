@@ -152,12 +152,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # RASM QABUL (ADMIN)
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    file_id = update.message.photo[-1].file_id
-
-    await update.message.reply_text(f"ID:\n{file_id}")
+    if update.effective_user.id != ADMIN_ID:
         return
 
-    print(update.message.photo[-1].file_id))
+    file_id = update.message.photo[-1].file_id
+    await update.message.reply_text(f"ID:\n{file_id}")
 
     context.user_data["photo"] = update.message.photo[-1].file_id
     context.user_data["step"] = "gender"
