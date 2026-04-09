@@ -5,9 +5,10 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler
 import asyncio
+import os
 
-TOKEN = "8658587411:AAGsC_Onp6tsi2Bl5K8sSMqHq699Y6bKzP0"
-ADMIN_ID = 401251407
+TOKEN = os.getenv("TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 product_locks = {}
 products = []
