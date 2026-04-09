@@ -152,12 +152,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # RASM QABUL (ADMIN)
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    file_id = update.message.photo[-1].file_id
+
+    await update.message.reply_text(f"ID:\n{file_id}")
         return
 
-file_id = update.message.photo[-1].file_id
-
-await update.message.reply_text(file_id)
+    print(update.message.photo[-1].file_id))
 
     context.user_data["photo"] = update.message.photo[-1].file_id
     context.user_data["step"] = "gender"
@@ -524,7 +524,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["name"] = text
         context.user_data["step"] = "size"
 
-        keyboard = [["50-55","55-60","60-65","65-70"],["70-75","75-80","80-85","85-90"],["90-95","95-100","105-110","110-115"],["115-120","120-125","125-130"],["🔙 Orqaga", "🏠 Bosh menyu"]]
+        keyboard = [["75-80","80-85","85-90"],["90-95","95-100","105-110","110-115"],["115-120","120-125","125-130"],["🔙 Orqaga", "🏠 Bosh menyu"]]
         await update.message.reply_text("O‘lcham:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return
     elif context.user_data.get("step") == "size":
