@@ -155,8 +155,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
 
-    file_id = update.message.photo[-1].file_id
-    await update.message.reply_text(f"ID:\n{file_id}")
+    print(update.message.photo[-1].file_id)
 
     context.user_data["photo"] = update.message.photo[-1].file_id
     context.user_data["step"] = "gender"
@@ -216,13 +215,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "📏 Razmer jadvali":
 
         images = [
-            "AgACAgIAAxkBAAIUMGnT3_ygo9D71LcXU02CpCCnGDvcAAILGGsbKLCgSnIkhjlFioIaAQADAgADeQADOwQ",
-            "AgACAgIAAxkBAAIUUGnT4g8wUh7XRa14PIXIiHIykOChAAIgGGsbKLCgSu9RA0Vm4ErIAQADAgADeQADOwQ",
-            "AgACAgIAAxkBAAIUUWnT4g8PCecHEZK_udyediGEfaiOAAIhGGsbKLCgSsvCSMSCP42IAQADAgADeQADOwQ",
-            "AgACAgIAAxkBAAIUUmnT4g8SZYg3u7rRQDj71gPoMG3OAAIiGGsbKLCgSkZn-iOydmfQAQADAgADeQADOwQ",
-            "AgACAgIAAxkBAAIUU2nT4g_PLZYFspoJ6ek9o-5HGaq2AAIjGGsbKLCgSlTXOV5vrhoFAQADAgADeQADOwQ",
-            "AgACAgIAAxkBAAIUVGnT4g-K24aZF0GRCdvgz4nU2_ACAAIkGGsbKLCgSjiUy8Y98avLAQADAgADeQADOwQ",
-            "AgACAgIAAxkBAAIUVWnT4g_HEGtzuOYebzIgQHBmLZM2AAIlGGsbKLCgSqauzPvcMoOYAQADAgADeQADOwQ"
+            AgACAgIAAxkBAAIglmnX1XJ2Za6zc4Svn1wLmGhE4Q5jAAIkF2sbymy5Su63OueLl84AAQEAAwIAA3kAAzsE,
+            AgACAgIAAxkBAAIgmGnX14xdrAqXRiMfrRGlq7lTiCkBAAIuF2sbymy5SvTdKaYZnU6_AQADAgADeQADOwQ
         ]
 
         for img in images:
