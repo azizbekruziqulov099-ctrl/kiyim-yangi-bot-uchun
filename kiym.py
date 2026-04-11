@@ -106,9 +106,6 @@ def load_orders():
 # 🔥 ENG MUHIM QISM
 load_products()   
 load_orders()
-for p in products:
-    if "reserved" not in p:
-        p["reserved"] = 0
 
 ADMIN_MENU = ReplyKeyboardMarkup(
     [
@@ -1693,7 +1690,11 @@ app.add_handler(CallbackQueryHandler(button_handler))
 
 load_products()
 load_orders()
+
 for p in products:
+    if "reserved" not in p:
+        p["reserved"] = 0
+
     if isinstance(p.get("season"), str):
-        p["season"] = [p["season"]]3
+        p["season"] = [p["season"]]
 app.run_polling()
