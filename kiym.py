@@ -81,14 +81,6 @@ def save_products():
 
 
 def load_products():
-    if context.user_data.get("filter_season"):
-    seasons = p.get("season", [])
-
-    if isinstance(seasons, str):
-        seasons = [seasons]
-
-    if context.user_data.get("filter_season") not in seasons:
-        return False
     global products
     try:
         with open("products.json", "r") as f:
@@ -1701,5 +1693,7 @@ app.add_handler(CallbackQueryHandler(button_handler))
 
 load_products()
 load_orders()
-
+for p in products:
+    if isinstance(p.get("season"), str):
+        p["season"] = [p["season"]]3
 app.run_polling()
