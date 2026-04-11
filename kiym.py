@@ -173,6 +173,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") == "gender":
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["gender"] = gender
+        context.user_data["seasons"] = []
         context.user_data["step"] = "season"
 
         keyboard = [["☀️ Yozgi", "❄️ Qishki"], ["🌸 Bahor", "🍂 Kuz"]]
@@ -181,7 +182,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
+    elif text == "✅ Tayyor" and context.user_data.get("step") == "season":
+        context.user_data["step"] = "category"
     
+        keyboard = get_category_buttons(context)
+    
+        await update.message.reply_text(
+            "Kategoriya:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+
     elif text == "🗑 Tozalash":
         if update.effective_user.id != ADMIN_ID:
             return
@@ -384,7 +394,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             keyboard = [
                 ["75-80","80-85","85-90"],
-                ["90-95","95-100","105-110"],
+                ["90-95","95-100","100-105","105-110"],
                 ["110-115","115-120","120-125","125-130"],
                 ["🔙 Orqaga", "🏠 Bosh menyu"]
             ]
@@ -470,17 +480,23 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif context.user_data.get("step") == "season":
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
-        
-        context.user_data["season"] = season
-        context.user_data["step"] = "category"
-
-        keyboard = get_category_buttons(context)   # 🔥 ENG MUHIM
-
+    
+        if "seasons" not in context.user_data:
+            context.user_data["seasons"] = []
+    
+        if season not in context.user_data["seasons"]:
+            context.user_data["seasons"].append(season)
+    
+        keyboard = [
+            ["☀️ Yozgi","❄️ Qishki"],
+            ["🌸 Bahor","🍂 Kuz"],
+            ["✅ Tayyor"]
+        ]
+    
         await update.message.reply_text(
-            "Kategoriya:",
+            f"Tanlangan fasllar: {', '.join(context.user_data['seasons'])}",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-        return
     
     elif context.user_data.get("step") == "category":
 
@@ -517,7 +533,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["name"] = text
         context.user_data["step"] = "size"
 
-        keyboard = [["75-80","80-85","85-90"],["90-95","95-100","105-110","110-115"],["115-120","120-125","125-130"],["🔙 Orqaga", "🏠 Bosh menyu"]]
+        keyboard = [["75-80","80-85","85-90"],["90-95","95-100","100-105","105-110"],["110-115","115-120","120-125","125-130"],["🔙 Orqaga", "🏠 Bosh menyu"]]
         await update.message.reply_text("O‘lcham:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return
     elif context.user_data.get("step") == "size":
@@ -533,7 +549,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         products.append({
             "photo": context.user_data["photo"],
             "gender": context.user_data["gender"],
-            "season": context.user_data["season"],
+            "season": context.user_data["seasons"],
             "category": context.user_data["category"],
             "name": context.user_data["name"],
             "size": context.user_data["size"],
@@ -592,7 +608,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         keyboard = [
             ["75-80","80-85","85-90"],
-            ["90-95","95-100","105-110"],
+            ["90-95","95-100","100-105","105-110"],
             ["110-115","115-120","120-125","125-130"],
             ["🔙 Orqaga", "🏠 Bosh menyu"]
         ]
