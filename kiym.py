@@ -47,7 +47,12 @@ def filter_check(p, context):
 
     # season
     if context.user_data.get("filter_season"):
-        if p["season"] != context.user_data.get("filter_season"):
+        seasons = p.get("season", [])
+    
+        if isinstance(seasons, str):
+            seasons = [seasons]
+    
+        if context.user_data.get("filter_season") not in seasons:
             return False
 
     # category
@@ -76,6 +81,14 @@ def save_products():
 
 
 def load_products():
+    if context.user_data.get("filter_season"):
+    seasons = p.get("season", [])
+
+    if isinstance(seasons, str):
+        seasons = [seasons]
+
+    if context.user_data.get("filter_season") not in seasons:
+        return False
     global products
     try:
         with open("products.json", "r") as f:
@@ -494,7 +507,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
     
         await update.message.reply_text(
-            f"Tanlangan fasllar: {', '.join(context.user_data['seasons'])}",
+            f"Tanlangan: {', '.join(context.user_data['seasons'])}",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
     
@@ -549,7 +562,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         products.append({
             "photo": context.user_data["photo"],
             "gender": context.user_data["gender"],
-            "season": context.user_data["seasons"],
+            "season": context.user_data.get("seasons", []),
             "category": context.user_data["category"],
             "name": context.user_data["name"],
             "size": context.user_data["size"],
