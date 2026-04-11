@@ -944,40 +944,55 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("add_"):
         idx = int(data.split("_")[1])
         product = products[idx]
-
-        # 🔥 TEKSHIRUV
+        user_id = query.from_user.id
+    
+        # 🔒 DOUBLE CLICK
+        last = context.user_data.get("last_add")
+        if last == idx:
+            return
+        context.user_data["last_add"] = idx
+    
+        if user_id not in carts:
+            carts[user_id] = {}
+    
+        # 🔒 QAYTA QO‘SHILMASIN
+        if idx in carts[user_id]:
+            await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
+            return
+    
+        # 🔥 mavjudligini tekshirish
         if product["count"] - product.get("reserved", 0) <= 0:
             await query.answer("❌ Mahsulot qolmagan!", show_alert=True)
             return
-
-        # 🔥 RESERVED OSHIRAMIZ
-        product["reserved"] = product.get("reserved", 0) + 1
-        save_products()
-
-        # 🔥 SAVAT
+    
+        # 🔥 savat yo‘q bo‘lsa yaratamiz
         if user_id not in carts:
             carts[user_id] = {}
-
+    
         import time
-        idx = int(idx)
-        if idx not in carts[user_id]:
-            carts[user_id][idx] = {
-                "qty": 1,
-                "time": time.time()
-            }
-        else:
-            carts[user_id][idx]["qty"] += 1
-            carts[user_id][idx]["time"] = time.time()
-
+    
+        # 🔥 AGAR OLDIN QO‘SHILGAN BO‘LSA — QAYTA QO‘SHMA
+        if idx in carts[user_id]:
+            await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
+            return
+    
+        # 🔥 YANGI QO‘SHISH
+        carts[user_id][idx] = {
+            "qty": 1,
+            "time": time.time()
+        }
+    
+        product["reserved"] = product.get("reserved", 0) + 1
+        save_products()
+    
         keyboard = [
             [InlineKeyboardButton("🧺 Savatga o‘tish", callback_data="go_cart")]
         ]
-
+    
         await query.message.reply_text(
-            "✅ Savatga qo‘shildi!\n⏳ 2 soat ichida buyurtma bermasangiz o‘chib ketadi.",
+            "✅ Savatga qo‘shildi!",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-
     elif data == "clear_yes":
         if query.from_user.id != ADMIN_ID:
             return
