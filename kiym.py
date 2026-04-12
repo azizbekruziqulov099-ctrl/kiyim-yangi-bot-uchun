@@ -699,7 +699,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_cart = {}
 
         for idx, item in cart.items():
-            if now - item["time"] < 7200:
+            if now - item["time"] < 7:
                 new_cart[int(idx)] = item
             else:
                 products[int(idx)]["reserved"] = max(
@@ -1447,7 +1447,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_cart = {}
 
         for idx, item in cart.items():
-            if now - item["time"] < 7200:
+            if now - item["time"] < 7:
                 new_cart[int(idx)] = item
             else:
                 products[int(idx)]["reserved"] = max(
@@ -1754,27 +1754,9 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ===== TOZALASH =====
         carts[user_id] = {}
         context.user_data.clear()
-async def auto_clear_reserved():
-    while True:
-        now = time.time()
-
-        for user_id, cart in carts.items():
-            for idx, item in list(cart.items()):
-                if now - item["time"] > 7200:
-                    products[int(idx)]["reserved"] = max(
-                        0,
-                        products[int(idx)].get("reserved", 0) - item["qty"]
-                    )
-                    del cart[idx]
-
-        save_products()
-        await asyncio.sleep(600)  # har 5 minut
 
 # Application'ni qurishda quyidagi tartibda qo'shing:
-async def on_start(app):
-    asyncio.create_task(auto_clear_reserved())
 app = ApplicationBuilder().token(TOKEN).build()
-app.post_init = on_start
 app.add_handler(CommandHandler("start", start))
 
 app.add_handler(MessageHandler(filters.PHOTO, photo_handler))
