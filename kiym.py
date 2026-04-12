@@ -650,10 +650,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if now - item["time"] < 7200:
                 new_cart[int(idx)] = item
             else:
-                products[int(idx)]["reserved"] = max(
-                    0,
-                    products[int(idx)].get("reserved", 0) - item["qty"]
-                )
+                # 🔒 faqat agar savatda hali bo‘lsa kamaytiradi
+                if int(idx) in cart:
+                    qty = item["qty"]
+
+                    if products[int(idx)].get("reserved", 0) >= qty:
+                        products[int(idx)]["reserved"] -= qty
+                    else:
+                        products[int(idx)]["reserved"] = 0
         carts[user_id] = new_cart
         cart = new_cart
         save_products()
@@ -1374,10 +1378,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if now - item["time"] < 7200:
                 new_cart[int(idx)] = item
             else:
-                products[int(idx)]["reserved"] = max(
-                    0,
-                    products[int(idx)].get("reserved", 0) - item["qty"]
-                )
+                # 🔒 faqat agar savatda hali bo‘lsa kamaytiradi
+                if int(idx) in cart:
+                    qty = item["qty"]
+
+                    if products[int(idx)].get("reserved", 0) >= qty:
+                        products[int(idx)]["reserved"] -= qty
+                    else:
+                        products[int(idx)]["reserved"] = 0
 
         carts[user_id] = new_cart
         cart = new_cart
@@ -1431,12 +1439,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if idx in cart:
             qty = cart[idx]["qty"]
-            products[idx]["reserved"] = max(
-                0,
-                products[idx].get("reserved", 0) - qty
-            )
-            cart.pop(idx)
 
+            # 🔒 faqat 1 marta kamaytiradi
+            if products[idx].get("reserved", 0) >= qty:
+                products[idx]["reserved"] -= qty
+            else:
+                products[idx]["reserved"] = 0
+
+            cart.pop(idx)
             save_products()
 
         await query.answer("❌ O‘chirildi")
