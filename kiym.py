@@ -645,7 +645,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 🔥 SHUNI QO‘SH
         cart = {idx: item for idx, item in cart.items() if idx < len(products)}
         carts[user_id] = cart
-            import time
+        import time
 
         now = time.time()
         new_cart = {}
@@ -972,11 +972,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if product["count"] - product.get("reserved", 0) <= 0:
             await query.answer("❌ Mahsulot qolmagan!", show_alert=True)
             return
-    
-        # 🔥 savat yo‘q bo‘lsa yaratamiz
-        if user_id not in carts:
-            carts[user_id] = {}
-    
+   
         import time
     
         # 🔥 AGAR OLDIN QO‘SHILGAN BO‘LSA — QAYTA QO‘SHMA
