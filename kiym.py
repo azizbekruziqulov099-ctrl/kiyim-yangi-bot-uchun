@@ -707,7 +707,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append([
                 InlineKeyboardButton("➖", callback_data=f"minus_{idx}"),
                 InlineKeyboardButton(f"{qty}", callback_data="none"),
-                InlineKeyboardButton("➕", callback_data=f"plus_{idx}")
+                InlineKeyboardButton("➕", callback_data=f"plus_{idx}"),
+                InlineKeyboardButton("❌", callback_data=f"del_{idx}")
             ])
 
         msg += f"\n💰 Jami: {total}"
@@ -1008,10 +1009,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     elif data.startswith("plus_"):
         idx = int(data.split("_")[1])
+    
+        if idx not in carts[user_id]:
+            return
+    
         product = products[idx]
     
-        if product["count"] - product.get("reserved", 0) <= 0:
-            await query.answer("❌ Yetarli emas", show_alert=True)
+        # 🔥 MAX LIMIT
+        if carts[user_id][idx]["qty"] >= product["count"]:
+            await query.answer("❌ Omborda bundan ko‘p yo‘q", show_alert=True)
             return
     
         carts[user_id][idx]["qty"] += 1
@@ -1019,20 +1025,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         save_products()
         await query.answer("➕")
+
     elif data.startswith("minus_"):
         idx = int(data.split("_")[1])
     
-        if idx in carts[user_id]:
-            carts[user_id][idx]["qty"] -= 1
-            products[idx]["reserved"] -= 1
+        if idx not in carts[user_id]:
+            return
     
-            if carts[user_id][idx]["qty"] <= 0:
-                carts[user_id].pop(idx)
+        carts[user_id][idx]["qty"] -= 1
+        products[idx]["reserved"] -= 1
     
-            save_products()
+        if carts[user_id][idx]["qty"] <= 0:
+            carts[user_id].pop(idx)
     
-        await query.answer("➖")
-    
+        save_products()
+        await query.answer("➖")    
+        
     elif data == "clear_yes":
         if query.from_user.id != ADMIN_ID:
             return
