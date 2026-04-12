@@ -1,4 +1,5 @@
 import json
+import time
 from telegram import KeyboardButton
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
@@ -654,7 +655,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 🔥 SHUNI QO‘SH
         cart = {idx: item for idx, item in cart.items() if idx < len(products)}
         carts[user_id] = cart
-        import time
 
         now = time.time()
         new_cart = {}
@@ -681,7 +681,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for idx, item in cart.items():
             qty = item["qty"]
-            p = products[idx]
+            p = products[int(idx)]
             def parse_price(price_str):
                 return int(
                 price_str.lower()
@@ -978,18 +978,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id not in carts:
             carts[user_id] = {}
     
-        # 🔒 QAYTA QO‘SHILMASIN
-        if idx in carts[user_id]:
-            await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
-            return
     
         # 🔥 mavjudligini tekshirish
         if product["count"] - product.get("reserved", 0) <= 0:
             await query.answer("❌ Mahsulot qolmagan!", show_alert=True)
             return
-   
-        import time
-    
+      
         # 🔥 AGAR OLDIN QO‘SHILGAN BO‘LSA — QAYTA QO‘SHMA
         if idx in carts[user_id]:
             await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
@@ -1068,23 +1062,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data == "clear_no":
         await query.message.reply_text("❌ Bekor qilindi")
-
-    elif data.startswith("plus_"):
-        idx = int(data.split("_")[1])
-        product = products[idx]
-
-        # 🔥 TEKSHIRUV
-        if product["count"] - product.get("reserved", 0) <= 0:
-            await query.answer("❌ Yetarli mahsulot yo‘q", show_alert=True)
-            return
-
-        carts[user_id][idx]["qty"] += 1
-        carts[user_id][idx]["time"] = time.time()
-
-        product["reserved"] += 1
-        save_products()
-
-        await query.answer("➕ Qo‘shildi")
 
     elif data.startswith("send_"):
         order_id = data.split("_")[1]
@@ -1408,7 +1385,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = query.from_user.id
         cart = carts.get(user_id, {})
 
-        import time
         now = time.time()
         new_cart = {}
 
