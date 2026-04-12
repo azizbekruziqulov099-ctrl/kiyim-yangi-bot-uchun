@@ -196,6 +196,7 @@ async def update_cart_message(query, user_id):
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
+    context.user_data.clear()
 
     print(update.message.photo[-1].file_id)
 
@@ -643,7 +644,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Tanlang:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
     # 👦 / 👧
-    elif text in ["👦 O‘g‘il", "👧 Qiz"]:
+    elif text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get("step") 
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["filter_gender"] = gender
         context.user_data["step"] = "choose_type"
