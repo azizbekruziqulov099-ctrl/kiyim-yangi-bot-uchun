@@ -152,7 +152,46 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=MAIN_MENU
         )
 
+async def update_cart_message(query, user_id):
+    cart = carts.get(user_id, {})
 
+    if not cart:
+        await query.message.edit_text("🧺 Savat bo‘sh")
+        return
+
+    msg = "🧺 Savat:\n\n"
+    total = 0
+    keyboard = []
+
+    for idx, item in cart.items():
+        qty = item["qty"]
+        p = products[int(idx)]
+
+        price = int(
+            p["price"].lower()
+            .replace("ming", "000")
+            .replace("so'm", "")
+            .replace("soʻm", "")
+            .replace(" ", "")
+        )
+
+        summa = price * qty
+        total += summa
+
+        msg += f"{p['name']} x{qty} = {summa}\n"
+
+        keyboard.append([
+            InlineKeyboardButton("➖", callback_data=f"minus_{idx}"),
+            InlineKeyboardButton(f"{qty}", callback_data="none"),
+            InlineKeyboardButton("➕", callback_data=f"plus_{idx}"),
+            InlineKeyboardButton("❌", callback_data=f"del_{idx}")
+        ])
+
+    msg += f"\n💰 Jami: {total}"
+
+    keyboard.append([InlineKeyboardButton("🚚 Buyurtma", callback_data="checkout")])
+
+    await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 # RASM QABUL (ADMIN)
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -1026,7 +1065,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         products[idx]["reserved"] += 1
     
         save_products()
-        await query.answer("➕")
+        await update_cart_message(query, user_id)
 
     elif data.startswith("minus_"):
         idx = int(data.split("_")[1])
@@ -1035,13 +1074,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     
         carts[user_id][idx]["qty"] -= 1
-        products[idx]["reserved"] -= 1
+        products[idx]["reserved"] = max(0, products[idx]["reserved"] - 1)
     
         if carts[user_id][idx]["qty"] <= 0:
             carts[user_id].pop(idx)
     
         save_products()
-        await query.answer("➖")    
+        await update_cart_message(query, user_id)    
         
     elif data == "clear_yes":
         if query.from_user.id != ADMIN_ID:
@@ -1449,7 +1488,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🔙 Orqaga", callback_data="back")
         ])
 
-        await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        await update_cart_message(query, user_id)
 
     elif data.startswith("del_"):
         idx = int(data.split("_")[1])
@@ -1739,6 +1778,21 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ===== TOZALASH =====
         carts[user_id] = {}
         context.user_data.clear()
+async def auto_clear_reserved():
+    while True:
+        now = time.time()
+
+        for user_id, cart in carts.items():
+            for idx, item in list(cart.items()):
+                if now - item["time"] > 7200:
+                    products[int(idx)]["reserved"] = max(
+                        0,
+                        products[int(idx)].get("reserved", 0) - item["qty"]
+                    )
+                    del cart[idx]
+
+        save_products()
+        await asyncio.sleep(300)  # har 5 minut
 
 # Application'ni qurishda quyidagi tartibda qo'shing:
 
@@ -1762,4 +1816,5 @@ for p in products:
 
     if isinstance(p.get("season"), str):
         p["season"] = [p["season"]]
+asyncio.create_task(auto_clear_reserved())
 app.run_polling()
