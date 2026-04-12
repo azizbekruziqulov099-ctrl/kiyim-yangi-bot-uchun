@@ -232,7 +232,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "season":
 
-        # ✅ AGAR "Tayyor" bosilsa → keyingi bosqich
         if text == "✅ Tayyor":
             context.user_data[ADMIN_STEP] = "category"
 
@@ -244,7 +243,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        # 🔥 AKS HOLDA fasl qo‘shadi
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
 
         if "seasons" not in context.user_data:
@@ -264,7 +262,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
-
     elif text == "🗑 Tozalash":
         if update.effective_user.id != ADMIN_ID:
             return
@@ -673,7 +670,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # ===== USER FLOW =====
-    elif text == "🛍 Kiyimlar":
+    elif user_id != ADMIN_ID and text == "🛍 Kiyimlar":
         context.user_data.clear()
         context.user_data[USER_STEP] = "gender"
          
@@ -681,7 +678,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Tanlang:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
     # 👦 / 👧
-    elif text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get(USER_STEP) == "gender":
+    elif user_id != ADMIN_ID and text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get(USER_STEP) == "gender":
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["filter_gender"] = gender
         context.user_data[USER_STEP] = "choose_type"
