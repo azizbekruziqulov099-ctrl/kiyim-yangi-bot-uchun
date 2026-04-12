@@ -232,6 +232,19 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "season":
 
+        # ✅ AGAR "Tayyor" bosilsa → keyingi bosqich
+        if text == "✅ Tayyor":
+            context.user_data[ADMIN_STEP] = "category"
+
+            keyboard = get_category_buttons(context)
+
+            await update.message.reply_text(
+                "Kategoriya:",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+            return
+
+        # 🔥 AKS HOLDA fasl qo‘shadi
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
 
         if "seasons" not in context.user_data:
@@ -250,17 +263,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Tanlangan: {', '.join(context.user_data['seasons'])}",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-        return    
-
-    elif text == "✅ Tayyor" and user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "season":
-        context.user_data[ADMIN_STEP] = "category"
-    
-        keyboard = get_category_buttons(context)
-    
-        await update.message.reply_text(
-            "Kategoriya:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
+        return
 
     elif text == "🗑 Tozalash":
         if update.effective_user.id != ADMIN_ID:
