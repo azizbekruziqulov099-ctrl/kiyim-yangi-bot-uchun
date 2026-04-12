@@ -1015,9 +1015,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         product = products[idx]
     
-        # 🔥 MAX LIMIT
-        if carts[user_id][idx]["qty"] >= product["count"]:
-            await query.answer("❌ Omborda bundan ko‘p yo‘q", show_alert=True)
+        # 🔥 ENG TO‘G‘RI HISOB
+        available = product["count"] - product.get("reserved", 0)
+    
+        if available <= 0:
+            await query.answer("❌ Mahsulot tugagan", show_alert=True)
             return
     
         carts[user_id][idx]["qty"] += 1
