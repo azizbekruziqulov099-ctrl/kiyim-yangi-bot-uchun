@@ -10,6 +10,8 @@ import os
 
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
+ADMIN_STEP = "admin_step"
+USER_STEP = "user_step"
 
 product_locks = {}
 products = []
@@ -201,8 +203,9 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(update.message.photo[-1].file_id)
 
     context.user_data["photo"] = update.message.photo[-1].file_id
-    context.user_data["step"] = "gender"
-
+        # ADMIN
+    context.user_data[ADMIN_STEP] = "gender"
+    
     keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
     await update.message.reply_text(
         "Kim uchun?",
@@ -211,13 +214,15 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # HANDLE
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    user_id = update.effective_user.id
     
     # ===== ADMIN FLOW =====
-    if context.user_data.get("step") == "gender":
+    # ===== ADMIN FLOW =====
+    if user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "gender":
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["gender"] = gender
         context.user_data["seasons"] = []
-        context.user_data["step"] = "season"
+        context.user_data[ADMIN_STEP] = "season"
 
         keyboard = [["☀️ Yozgi", "❄️ Qishki"], ["🌸 Bahor", "🍂 Kuz"]]
         await update.message.reply_text(
@@ -225,8 +230,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
-    elif text == "✅ Tayyor" and context.user_data.get("step") == "season":
-        context.user_data["step"] = "category"
+    elif text == "✅ Tayyor" and user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "season":
+        context.user_data[ADMIN_STEP] = "category"
     
         keyboard = get_category_buttons(context)
     
@@ -277,10 +282,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text("🏠 Bosh menyu", reply_markup=MAIN_MENU)
         
-    elif context.user_data.get("step") == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
+    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
         context.user_data["filter_season"] = season
-        context.user_data["step"] = "size_category"
+        context.user_data[ADMIN_STEP] = "size_category"
 
        
         keyboard = get_category_buttons(context)
@@ -290,7 +295,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ) 
         return  
 
-    elif context.user_data.get("step") == "size_category" and "(" in text:
+    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "size_category" and "(" in text:
 
         category = text.split("(")[0]
         category = category.replace("👕","").replace("👖","").replace("🧥","") \
@@ -320,7 +325,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for i, p in enumerate(products):
             if (
-                p["size"] == context.user_data.get("filter_size")
+                if context.user_data.get("filter_size"):
+                    if p["size"] != context.user_data.get("filter_size"):
+                        continue
                 and category == p["category"].lower()
                 and (p["count"] - p.get("reserved", 0)) > 0
             ):
@@ -419,11 +426,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📞 Telefon yuboring:")    
 
     elif text == "🔙 Orqaga":
-        step = context.user_data.get("step")
+        if user_id == ADMIN_ID:
+            step = context.user_data.get(ADMIN_STEP)
+        else:
+            step = context.user_data.get(USER_STEP)
+        STEP = ADMIN_STEP if user_id == ADMIN_ID else USER_STEP
 
         # 🔹 size_category → size_season
         if step == "size_category":
-            context.user_data["step"] = "size_season"
+            context.user_data[STEP] = "size_season"
 
             keyboard = [
                 ["☀️ Yozgi","❄️ Qishki"],
@@ -438,7 +449,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 size_season → size_filter
         elif step == "size_season":
-            context.user_data["step"] = "size_filter"
+            context.user_data[STEP] = "size_filter"
 
             keyboard = [
                 ["75-80","80-85","85-90"],
@@ -454,7 +465,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 size_filter → choose_type
         elif step == "size_filter":
-            context.user_data["step"] = "choose_type"
+            context.user_data[STEP] = "choose_type"
 
             keyboard = [
                 ["📏 Razmer bo‘yicha", "📂 Umumiy"],
@@ -468,7 +479,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 choose_type → gender
         elif step == "choose_type":
-            context.user_data["step"] = "user_gender"
+            context.user_data[STEP] = "user_gender"
 
             keyboard = [
                 ["👦 O‘g‘il", "👧 Qiz"],
@@ -482,7 +493,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 user_category → user_season
         elif step == "user_category":
-            context.user_data["step"] = "user_season"
+            context.user_data[STEP] = "user_season"
 
             keyboard = [
                 ["☀️ Yozgi","❄️ Qishki"],
@@ -497,7 +508,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 user_season → choose_type
         elif step == "user_season":
-            context.user_data["step"] = "choose_type"
+            context.user_data[STEP] = "choose_type"
 
             keyboard = [
                 ["📏 Razmer bo‘yicha", "📂 Umumiy"],
@@ -514,7 +525,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
             await update.message.reply_text("🏠 Bosh menyu", reply_markup=MAIN_MENU)
 
-        return
+            return
     elif text == "📊 Statistika":
         if update.effective_user.id != ADMIN_ID:
             return
@@ -526,7 +537,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📊 Buyurtmalar: {count}\n💰 Jami: {total}"
         )
 
-    elif context.user_data.get("step") == "season":
+    elif user_id != ADMIN_ID and context.user_data.get(USER_STEP) == "user_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
     
         if "seasons" not in context.user_data:
@@ -546,7 +557,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
     
-    elif context.user_data.get("step") == "category":
+    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "category":
 
         category = text.split("(")[0]
         category = category.replace("👕","").replace("👖","").replace("🧥","") \
@@ -573,31 +584,31 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             category = "ichki kiyim"
 
         context.user_data["category"] = category
-        context.user_data["step"] = "name"
+        context.user_data[ADMIN_STEP] = "name"
 
         await update.message.reply_text("Nomini yozing:")
         return
-    elif context.user_data.get("step") == "name":
+    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "name":
         context.user_data["name"] = text
-        context.user_data["step"] = "size"
+        context.user_data[ADMIN_STEP] = "size"
 
         keyboard = [["75-80","80-85","85-90"],["90-95","95-100","100-105","105-110"],["110-115","115-120","120-125","125-130"],["🔙 Orqaga", "🏠 Bosh menyu"]]
         await update.message.reply_text("O‘lcham:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return
-    elif context.user_data.get("step") == "size":
+    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "size":
         context.user_data["size"] = text.replace(" ", "")
-        context.user_data["step"] = "price"
+        context.user_data[ADMIN_STEP] = "price"
 
         await update.message.reply_text("Narx:")
         return
-    elif context.user_data.get("step") == "price":
+    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "price":
         context.user_data["price"] = text
-        context.user_data["step"] = "count"
+        context.user_data[ADMIN_STEP] = "count"
 
         await update.message.reply_text("Nechta bor? (son kiriting)")
         return
 
-    elif context.user_data.get("step") == "count":
+    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "count":
         try:
             count = int(text)
         except:
@@ -621,10 +632,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text("✅ Qo‘shildi!")
         return
-    elif context.user_data.get("step") == "size_filter" and "-" in text:
+    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "size_filter" and "-" in text:
         size = text.replace(" ", "")
         context.user_data["filter_size"] = size
-        context.user_data["step"] = "size_season"
+        context.user_data[ADMIN_STEP] = "size_season"
 
         keyboard = [
             ["☀️ Yozgi","❄️ Qishki"],
@@ -639,15 +650,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ===== USER FLOW =====
     elif text == "🛍 Kiyimlar":
-        context.user_data.clear() 
+        context.user_data.clear()
+        context.user_data[USER_STEP] = "gender"
+         
         keyboard = [["👦 O‘g‘il", "👧 Qiz"],["🔙 Orqaga", "🏠 Bosh menyu"]]
         await update.message.reply_text("Tanlang:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
     # 👦 / 👧
-    elif text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get("step") 
+    elif text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get(USER_STEP) == "gender":
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["filter_gender"] = gender
-        context.user_data["step"] = "choose_type"
+        context.user_data[USER_STEP] = "choose_type"
 
         keyboard = [
             ["📏 Razmer bo‘yicha", "📂 Umumiy"],
@@ -659,9 +672,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
-    elif text == "📏 Razmer bo‘yicha":
+    elif user_id != ADMIN_ID and text == "📏 Razmer bo‘yicha":
 
-        context.user_data["step"] = "size_filter"
+        context.user_data[USER_STEP] = "size_filter"
 
         keyboard = [
             ["75-80","80-85","85-90"],
@@ -676,7 +689,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     elif text == "📂 Umumiy":
 
-        context.user_data["step"] = "user_season"
+        context.user_data[USER_STEP] = "user_season"
 
         keyboard = [
             ["☀️ Yozgi","❄️ Qishki"],
@@ -693,7 +706,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         cart = carts.get(user_id, {})
             # 🔥 SHUNI QO‘SH
-        cart = {idx: item for idx, item in cart.items() if idx < len(products)}
+        cart = {int(idx): item for idx, item in cart.items() if int(idx) < len(products)}
         carts[user_id] = cart
 
         now = time.time()
@@ -758,10 +771,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
     # 🌦 FASL
-    elif text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
+    elif user_id != ADMIN_ID and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
         context.user_data["filter_season"] = season
-        context.user_data["step"] = "user_category"
+        context.user_data[USER_STEP] = "user_category"
 
         keyboard = get_category_buttons(context)
         await update.message.reply_text(
@@ -771,7 +784,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 👕 KATEGORIYA → STOP (FAqat mahsulot chiqadi)
-    elif "(" in text and context.user_data.get("step") == "user_category":
+    elif "(" in text and context.user_data.get(USER_STEP) == "user_category":
 
         category = text.split("(")[0]
         category = category.replace("👕","").replace("👖","").replace("🧥","") \
@@ -1539,20 +1552,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🏠 Bosh menyu",
             reply_markup=MAIN_MENU
             
-        )
-    elif data.startswith("confirm_"):
-        order_id = data.split("_")[1]
-        order = orders.get(order_id)
-
-        if not order:
-            return
-
-        user_id = order["user_id"]
-
-        # USERGA
-        await context.bot.send_message(
-            chat_id=user_id,
-            text="📦 Buyurtmangiz tayyor!\n🕒 Kelishilgan vaqtda olib ketishingiz mumkin."
         )
 
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
