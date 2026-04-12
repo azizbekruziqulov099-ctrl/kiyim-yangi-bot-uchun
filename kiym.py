@@ -848,7 +848,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.message.reply_text(
-                "📍 Olib ketish manzili:\nSamarqand, Pastdarg‘om, Charxin\n📞 +998915388499",
+                "📍 Olib ketish manzili:\nSamarqand, Pastdarg‘om, Charxin\nA'loqa 📞 +998915388499  Adminlar o'zlari a'loqaga chiqishadi va manzilni yetgazishadi. " 
+                ,
                 reply_markup=MAIN_MENU
             )
 
@@ -1690,8 +1691,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # USER GA MANZIL
             await update.message.reply_text(
-                "📍 Olib ketish manzili:\nSamarqand, Pastdarg‘om, Charxin\n 
-                A'loqa 📞 +998915388499  Adminlar o'zlari a'loqaga chiqishadi va manzilni yetgazishadi. " 
+                "📍 Olib ketish manzili:\nSamarqand, Pastdarg‘om, Charxin\n A'loqa 📞 +998915388499  Adminlar o'zlari a'loqaga chiqishadi va manzilni yetgazishadi. " 
                 
             )
 
@@ -1718,7 +1718,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"📦 Pickup tayyor\nID: {order_id}"
         )
 
-        await query.answer("Tasdiqlandi")
+       # await query.answer("Tasdiqlandi")
     # ===== TOZALASH =====
         carts[user_id] = {}
         context.user_data.clear()
