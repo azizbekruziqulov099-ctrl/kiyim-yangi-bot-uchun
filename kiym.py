@@ -230,6 +230,28 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
+    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "season":
+
+        season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
+
+        if "seasons" not in context.user_data:
+            context.user_data["seasons"] = []
+
+        if season not in context.user_data["seasons"]:
+            context.user_data["seasons"].append(season)
+
+        keyboard = [
+            ["☀️ Yozgi","❄️ Qishki"],
+            ["🌸 Bahor","🍂 Kuz"],
+            ["✅ Tayyor"]
+        ]
+
+        await update.message.reply_text(
+            f"Tanlangan: {', '.join(context.user_data['seasons'])}",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return    
+
     elif text == "✅ Tayyor" and user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "season":
         context.user_data[ADMIN_STEP] = "category"
     
@@ -539,26 +561,23 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif user_id != ADMIN_ID and context.user_data.get(USER_STEP) == "user_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
+
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
-    
-        if "seasons" not in context.user_data:
-            context.user_data["seasons"] = []
-    
-        if season not in context.user_data["seasons"]:
-            context.user_data["filter_season"] = season
-            context.user_data[USER_STEP] = "user_category"
-    
-        keyboard = [
-            ["☀️ Yozgi","❄️ Qishki"],
-            ["🌸 Bahor","🍂 Kuz"],
-            ["✅ Tayyor"]
-        ]
-    
+
+        # 🔥 faqat bitta fasl saqlanadi
+        context.user_data["filter_season"] = season
+
+        # 🔥 keyingi bosqich
+        context.user_data[USER_STEP] = "user_category"
+
+        # 🔥 darhol kategoriya chiqadi
+        keyboard = get_category_buttons(context)
+
         await update.message.reply_text(
-            f"Tanlangan: {', '.join(context.user_data['seasons'])}",
+            "Kategoriya tanlang:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-    
+        return    
     elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "category":
 
         category = text.split("(")[0]
@@ -673,8 +692,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Qanday qidirasiz?",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-
-    elif user_id != ADMIN_ID and text == "📏 Razmer bo‘yicha":
+    elif user_id != ADMIN_ID and context.user_data.get(USER_STEP) == "choose_type" and text == "📏 Razmer bo‘yicha":
 
         context.user_data[USER_STEP] = "size_filter"
 
@@ -689,7 +707,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📏 Razmer tanlang:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-    elif user_id != ADMIN_ID and text == "📂 Umumiy":
+    elif user_id != ADMIN_ID and context.user_data.get(USER_STEP) == "choose_type" and text == "📂 Umumiy":
 
         context.user_data[USER_STEP] = "user_season"
 
@@ -773,19 +791,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
     # 🌦 FASL
-    elif user_id != ADMIN_ID and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
-        season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
-        context.user_data["filter_season"] = season
-        context.user_data[USER_STEP] = "user_category"
-
-        keyboard = get_category_buttons(context)
-        await update.message.reply_text(
-            "Kategoriya tanlang:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
-        return
-
-    # 👕 KATEGORIYA → STOP (FAqat mahsulot chiqadi)
+       # 👕 KATEGORIYA → STOP (FAqat mahsulot chiqadi)
     elif "(" in text and context.user_data.get(USER_STEP) == "user_category":
 
         category = text.split("(")[0]
