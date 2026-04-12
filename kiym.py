@@ -551,8 +551,18 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     elif context.user_data.get("step") == "price":
         context.user_data["price"] = text
+        context.user_data["step"] = "count"
 
-        # 🔥 SAQLAYMIZ
+        await update.message.reply_text("Nechta bor? (son kiriting)")
+        return
+
+    elif context.user_data.get("step") == "count":
+        try:
+            count = int(text)
+        except:
+            await update.message.reply_text("❌ Son kiriting")
+            return
+
         products.append({
             "photo": context.user_data["photo"],
             "gender": context.user_data["gender"],
@@ -561,12 +571,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "name": context.user_data["name"],
             "size": context.user_data["size"],
             "price": context.user_data["price"],
-            "count": 1,
-            "reserved": 0 
+            "count": count,
+            "reserved": 0
         })
 
         save_products()
-
         context.user_data.clear()
 
         await update.message.reply_text("✅ Qo‘shildi!")
@@ -696,7 +705,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg += f"{p['name']} x{qty} = {summa}\n"
 
             keyboard.append([
-                InlineKeyboardButton("❌", callback_data=f"del_{idx}")
+                InlineKeyboardButton("➖", callback_data=f"minus_{idx}"),
+                InlineKeyboardButton(f"{qty}", callback_data="none"),
+                InlineKeyboardButton("➕", callback_data=f"plus_{idx}")
             ])
 
         msg += f"\n💰 Jami: {total}"
@@ -751,7 +762,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if category.strip().lower() == p["category"].strip().lower():
                 found = True
 
-                if update.effective_user.id == ADMIN_ID:
+                if update.message.from_user.id == ADMIN_ID:
                     keyboard = [
                         [InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{i}")]
                     ]
@@ -1001,6 +1012,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Savatga qo‘shildi!",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+    elif data.startswith("plus_"):
+        idx = int(data.split("_")[1])
+        product = products[idx]
+    
+        if product["count"] - product.get("reserved", 0) <= 0:
+            await query.answer("❌ Yetarli emas", show_alert=True)
+            return
+    
+        carts[user_id][idx]["qty"] += 1
+        products[idx]["reserved"] += 1
+    
+        save_products()
+        await query.answer("➕")
+    elif data.startswith("minus_"):
+        idx = int(data.split("_")[1])
+    
+        if idx in carts[user_id]:
+            carts[user_id][idx]["qty"] -= 1
+            products[idx]["reserved"] -= 1
+    
+            if carts[user_id][idx]["qty"] <= 0:
+                carts[user_id].pop(idx)
+    
+            save_products()
+    
+        await query.answer("➖")
+    
     elif data == "clear_yes":
         if query.from_user.id != ADMIN_ID:
             return
