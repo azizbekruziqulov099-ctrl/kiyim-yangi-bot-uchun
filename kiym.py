@@ -670,13 +670,21 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # ===== USER FLOW =====
-    elif user_id != ADMIN_ID and text == "🛍 Kiyimlar":
-        context.user_data.clear()
-        context.user_data[USER_STEP] = "gender"
-         
-        keyboard = [["👦 O‘g‘il", "👧 Qiz"],["🔙 Orqaga", "🏠 Bosh menyu"]]
-        await update.message.reply_text("Tanlang:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+    elif text == "🛍 Kiyimlar":
 
+        context.user_data.clear()
+
+        if user_id == ADMIN_ID:
+            context.user_data[ADMIN_STEP] = "size_filter"
+        else:
+            context.user_data[USER_STEP] = "gender"
+
+        keyboard = [["👦 O‘g‘il", "👧 Qiz"],["🔙 Orqaga", "🏠 Bosh menyu"]]
+
+        await update.message.reply_text(
+            "Tanlang:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
     # 👦 / 👧
     elif user_id != ADMIN_ID and text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get(USER_STEP) == "gender":
         gender = text.replace("👦 ", "").replace("👧 ", "")
