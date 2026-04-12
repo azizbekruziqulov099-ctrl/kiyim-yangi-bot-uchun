@@ -875,7 +875,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, item in data["cart"].items():
             qty = item["qty"]
             products[int(idx)]["count"] -= qty
-            products[int(idx)]["reserved"] -= qty
+            products[int(idx)]["reserved"] = max(
+                0,
+                products[int(idx)].get("reserved", 0) - qty
+            )
 
         save_products()
 
@@ -1240,7 +1243,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             qty = item["qty"]
 
             products[int(idx)]["count"] += qty
-            products[int(idx)]["reserved"] -= qty   # 🔥 MUHIM
+            products[int(idx)]["reserved"] = max(
+                0,
+                products[int(idx)].get("reserved", 0) - qty
+            )   # 🔥 MUHIM
 
         save_products()
 
@@ -1275,7 +1281,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, item in order["cart"].items():
             qty = item["qty"]
             products[int(idx)]["count"] += qty
-            products[int(idx)]["reserved"] -= qty
+            products[int(idx)]["reserved"] = max(
+                0,
+                products[int(idx)].get("reserved", 0) - qty
+            )
 
         save_products()
 
@@ -1492,59 +1501,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("del_"):
         idx = int(data.split("_")[1])
-
+    
         user_id = query.from_user.id
         cart = carts.get(user_id, {})
-
+    
         if idx in cart:
             qty = cart[idx]["qty"]
+    
             products[idx]["reserved"] = max(
                 0,
                 products[idx].get("reserved", 0) - qty
             )
+    
             cart.pop(idx)
-
             save_products()
-
+    
         await query.answer("❌ O‘chirildi")
-
-        # 🔥 SAVATNI QAYTA CHIQARAMIZ
-        if not cart:
-            await query.message.reply_text("🧺 Savat bo‘sh")
-            return
-
-        msg = "🧺 Savat:\n\n"
-        total = 0
-        keyboard = []
-
-        for i, item in cart.items():
-            qty = item["qty"]
-            p = products[int(i)]
-
-            price = int(
-                p["price"].lower()
-                .replace("ming", "000")
-                .replace("so'm", "")
-                .replace("soʻm", "")
-                .replace(" ", "")
-            )
-
-            summa = price * qty
-            total += summa
-
-            msg += f"{p['name']} x{qty} = {summa}\n"
-
-            keyboard.append([
-                InlineKeyboardButton("❌", callback_data=f"del_{i}")
-            ])
-
-        msg += f"\n💰 Jami: {total}"
-
-        keyboard.append([InlineKeyboardButton("🚚 Buyurtma berish", callback_data="checkout")])
-        keyboard.append([InlineKeyboardButton("🔙 Orqaga", callback_data="back")])
-
-        await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-
+    
+        await update_cart_message(query, user_id)
     elif data == "checkout":
         context.user_data["order_step"] = "choose_type"
 
@@ -1673,7 +1647,10 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, item in data["cart"].items():
             qty = item["qty"]
             products[int(idx)]["count"] -= qty
-            products[int(idx)]["reserved"] -= qty
+            products[int(idx)]["reserved"] = max(
+                0,
+                products[int(idx)].get("reserved", 0) - qty
+            )
 
         save_products()
 # ===== USERGA MAHSULOT =====
@@ -1774,7 +1751,6 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"📦 Pickup tayyor\nID: {order_id}"
         )
 
-        await query.answer("Tasdiqlandi")
     # ===== TOZALASH =====
         carts[user_id] = {}
         context.user_data.clear()
@@ -1792,12 +1768,13 @@ async def auto_clear_reserved():
                     del cart[idx]
 
         save_products()
-        await asyncio.sleep(300)  # har 5 minut
+        await asyncio.sleep(600)  # har 5 minut
 
 # Application'ni qurishda quyidagi tartibda qo'shing:
-
+async def on_start(app):
+    asyncio.create_task(auto_clear_reserved())
 app = ApplicationBuilder().token(TOKEN).build()
-
+app.post_init = on_start
 app.add_handler(CommandHandler("start", start))
 
 app.add_handler(MessageHandler(filters.PHOTO, photo_handler))
@@ -1816,5 +1793,5 @@ for p in products:
 
     if isinstance(p.get("season"), str):
         p["season"] = [p["season"]]
-asyncio.create_task(auto_clear_reserved())
+
 app.run_polling()
