@@ -1005,8 +1005,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
         await query.message.reply_text(
             "✅ Savatga qo‘shildi! 2soat ichida maxsulotni savatga oʻtib harid qilmasangiz, maxsulot savatdan oʻchadi",
-            reply_markup=InlineKeyboardMarkup(keybo
-                                              ard)
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
     elif data.startswith("delete_"):
