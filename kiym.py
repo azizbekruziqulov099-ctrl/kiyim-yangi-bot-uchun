@@ -674,6 +674,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         context.user_data.clear()
 
+        # 🔥 ADMIN HAM USER HAM BIR XIL BOSHLAYDI
         context.user_data[USER_STEP] = "gender"
 
         keyboard = [
@@ -687,7 +688,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     # 👦 / 👧
-    elif user_id != ADMIN_ID and text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get(USER_STEP) == "gender":
+    elif text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get(USER_STEP) == "gender":
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["filter_gender"] = gender
         context.user_data[USER_STEP] = "choose_type"
@@ -716,6 +717,39 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📏 Razmer tanlang:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
+
+    elif context.user_data.get(USER_STEP) == "size_filter" and "-" in text:
+
+        size = text.replace(" ", "")
+        context.user_data["filter_size"] = size
+        context.user_data[USER_STEP] = "size_season"
+
+        keyboard = [
+            ["☀️ Yozgi","❄️ Qishki"],
+            ["🌸 Bahor","🍂 Kuz"],
+            ["🔙 Orqaga", "🏠 Bosh menyu"]
+        ]
+
+        await update.message.reply_text(
+            "Fasl tanlang:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return
+
+    elif context.user_data.get(USER_STEP) == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
+
+        season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
+        context.user_data["filter_season"] = season
+        context.user_data[USER_STEP] = "size_category"
+
+        keyboard = get_category_buttons(context)
+
+        await update.message.reply_text(
+            "Kategoriya tanlang:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return
+
     elif user_id != ADMIN_ID and context.user_data.get(USER_STEP) == "choose_type" and text == "📂 Umumiy":
 
         context.user_data[USER_STEP] = "user_season"
