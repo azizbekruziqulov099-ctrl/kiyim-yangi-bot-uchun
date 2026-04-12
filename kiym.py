@@ -674,34 +674,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         context.user_data.clear()
 
-        if user_id == ADMIN_ID:
-            context.user_data[ADMIN_STEP] = "size_filter"
+        context.user_data[USER_STEP] = "gender"
 
-            keyboard = [
-                ["75-80","80-85","85-90"],
-                ["90-95","95-100","100-105","105-110"],
-                ["110-115","115-120","120-125","125-130"],
-                ["🔙 Orqaga", "🏠 Bosh menyu"]
-            ]
+        keyboard = [
+            ["👦 O‘g‘il", "👧 Qiz"],
+            ["🔙 Orqaga", "🏠 Bosh menyu"]
+        ]
 
-            await update.message.reply_text(
-                "📏 Razmer tanlang:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
-
-        else:
-            context.user_data[USER_STEP] = "gender"
-
-            keyboard = [
-                ["👦 O‘g‘il", "👧 Qiz"],
-                ["🔙 Orqaga", "🏠 Bosh menyu"]
-            ]
-
-            await update.message.reply_text(
-                "Tanlang:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
-
+        await update.message.reply_text(
+            "Kim uchun:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
         return
     # 👦 / 👧
     elif user_id != ADMIN_ID and text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get(USER_STEP) == "gender":
