@@ -322,13 +322,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             category = "ichki kiyim"
 
         found = False
-
         for i, p in enumerate(products):
+
+            if context.user_data.get("filter_size"):
+                if p["size"] != context.user_data.get("filter_size"):
+                    continue
+
             if (
-                if context.user_data.get("filter_size"):
-                    if p["size"] != context.user_data.get("filter_size"):
-                        continue
-                and category == p["category"].lower()
+                category == p["category"].lower()
                 and (p["count"] - p.get("reserved", 0)) > 0
             ):
                 found = True
@@ -544,7 +545,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["seasons"] = []
     
         if season not in context.user_data["seasons"]:
-            context.user_data["seasons"].append(season)
+            context.user_data["filter_season"] = season
+            context.user_data[USER_STEP] = "user_category"
     
         keyboard = [
             ["☀️ Yozgi","❄️ Qishki"],
@@ -687,7 +689,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📏 Razmer tanlang:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-    elif text == "📂 Umumiy":
+    elif user_id != ADMIN_ID and text == "📂 Umumiy":
 
         context.user_data[USER_STEP] = "user_season"
 
