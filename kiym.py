@@ -1,5 +1,4 @@
 import json
-import time
 from telegram import KeyboardButton
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
@@ -10,8 +9,6 @@ import os
 
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
-ADMIN_STEP = "admin_step"
-USER_STEP = "user_step"
 
 product_locks = {}
 products = []
@@ -154,58 +151,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=MAIN_MENU
         )
 
-async def update_cart_message(query, user_id):
-    cart = carts.get(user_id, {})
 
-    if not cart:
-        await query.message.edit_text("🧺 Savat bo‘sh")
-        return
-
-    msg = "🧺 Savat:\n\n"
-    total = 0
-    keyboard = []
-
-    for idx, item in cart.items():
-        qty = item["qty"]
-        p = products[int(idx)]
-
-        price = int(
-            p["price"].lower()
-            .replace("ming", "000")
-            .replace("so'm", "")
-            .replace("soʻm", "")
-            .replace(" ", "")
-        )
-
-        summa = price * qty
-        total += summa
-
-        msg += f"{p['name']} x{qty} = {summa}\n"
-
-        keyboard.append([
-            InlineKeyboardButton("➖", callback_data=f"minus_{idx}"),
-            InlineKeyboardButton(f"{qty}", callback_data="none"),
-            InlineKeyboardButton("➕", callback_data=f"plus_{idx}"),
-            InlineKeyboardButton("❌", callback_data=f"del_{idx}")
-        ])
-
-    msg += f"\n💰 Jami: {total}"
-
-    keyboard.append([InlineKeyboardButton("🚚 Buyurtma", callback_data="checkout")])
-
-    await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 # RASM QABUL (ADMIN)
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
-    context.user_data.clear()
 
     print(update.message.photo[-1].file_id)
 
     context.user_data["photo"] = update.message.photo[-1].file_id
-        # ADMIN
-    context.user_data[ADMIN_STEP] = "gender"
-    
+    context.user_data["step"] = "gender"
+
     keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
     await update.message.reply_text(
         "Kim uchun?",
@@ -214,15 +170,13 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # HANDLE
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-    user_id = update.effective_user.id
     
     # ===== ADMIN FLOW =====
-    # ===== ADMIN FLOW =====
-    if user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "gender":
+    if context.user_data.get("step") == "gender":
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["gender"] = gender
         context.user_data["seasons"] = []
-        context.user_data[ADMIN_STEP] = "season"
+        context.user_data["step"] = "season"
 
         keyboard = [["☀️ Yozgi", "❄️ Qishki"], ["🌸 Bahor", "🍂 Kuz"]]
         await update.message.reply_text(
@@ -230,38 +184,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
-    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "season":
-
-        if text == "✅ Tayyor":
-            context.user_data[ADMIN_STEP] = "category"
-
-            keyboard = get_category_buttons(context)
-
-            await update.message.reply_text(
-                "Kategoriya:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
-            return
-
-        season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
-
-        if "seasons" not in context.user_data:
-            context.user_data["seasons"] = []
-
-        if season not in context.user_data["seasons"]:
-            context.user_data["seasons"].append(season)
-
-        keyboard = [
-            ["☀️ Yozgi","❄️ Qishki"],
-            ["🌸 Bahor","🍂 Kuz"],
-            ["✅ Tayyor"]
-        ]
-
+    elif text == "✅ Tayyor" and context.user_data.get("step") == "season":
+        context.user_data["step"] = "category"
+    
+        keyboard = get_category_buttons(context)
+    
         await update.message.reply_text(
-            f"Tanlangan: {', '.join(context.user_data['seasons'])}",
+            "Kategoriya:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-        return
+
     elif text == "🗑 Tozalash":
         if update.effective_user.id != ADMIN_ID:
             return
@@ -304,10 +236,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text("🏠 Bosh menyu", reply_markup=MAIN_MENU)
         
-    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
+    elif context.user_data.get("step") == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
         context.user_data["filter_season"] = season
-        context.user_data[ADMIN_STEP] = "size_category"
+        context.user_data["step"] = "size_category"
 
        
         keyboard = get_category_buttons(context)
@@ -317,7 +249,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ) 
         return  
 
-    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "size_category" and "(" in text:
+    elif context.user_data.get("step") == "size_category" and "(" in text:
 
         category = text.split("(")[0]
         category = category.replace("👕","").replace("👖","").replace("🧥","") \
@@ -344,14 +276,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             category = "ichki kiyim"
 
         found = False
+
         for i, p in enumerate(products):
-
-            if context.user_data.get("filter_size"):
-                if p["size"] != context.user_data.get("filter_size"):
-                    continue
-
             if (
-                category == p["category"].lower()
+                p["size"] == context.user_data.get("filter_size")
+                and category == p["category"].lower()
                 and (p["count"] - p.get("reserved", 0)) > 0
             ):
                 found = True
@@ -449,15 +378,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📞 Telefon yuboring:")    
 
     elif text == "🔙 Orqaga":
-        if user_id == ADMIN_ID:
-            step = context.user_data.get(ADMIN_STEP)
-        else:
-            step = context.user_data.get(USER_STEP)
-        STEP = ADMIN_STEP if user_id == ADMIN_ID else USER_STEP
+        step = context.user_data.get("step")
 
         # 🔹 size_category → size_season
         if step == "size_category":
-            context.user_data[STEP] = "size_season"
+            context.user_data["step"] = "size_season"
 
             keyboard = [
                 ["☀️ Yozgi","❄️ Qishki"],
@@ -472,7 +397,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 size_season → size_filter
         elif step == "size_season":
-            context.user_data[STEP] = "size_filter"
+            context.user_data["step"] = "size_filter"
 
             keyboard = [
                 ["75-80","80-85","85-90"],
@@ -488,7 +413,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 size_filter → choose_type
         elif step == "size_filter":
-            context.user_data[STEP] = "choose_type"
+            context.user_data["step"] = "choose_type"
 
             keyboard = [
                 ["📏 Razmer bo‘yicha", "📂 Umumiy"],
@@ -502,7 +427,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 choose_type → gender
         elif step == "choose_type":
-            context.user_data[STEP] = "user_gender"
+            context.user_data["step"] = "user_gender"
 
             keyboard = [
                 ["👦 O‘g‘il", "👧 Qiz"],
@@ -516,7 +441,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 user_category → user_season
         elif step == "user_category":
-            context.user_data[STEP] = "user_season"
+            context.user_data["step"] = "user_season"
 
             keyboard = [
                 ["☀️ Yozgi","❄️ Qishki"],
@@ -531,7 +456,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔹 user_season → choose_type
         elif step == "user_season":
-            context.user_data[STEP] = "choose_type"
+            context.user_data["step"] = "choose_type"
 
             keyboard = [
                 ["📏 Razmer bo‘yicha", "📂 Umumiy"],
@@ -548,7 +473,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
             await update.message.reply_text("🏠 Bosh menyu", reply_markup=MAIN_MENU)
 
-            return
+        return
     elif text == "📊 Statistika":
         if update.effective_user.id != ADMIN_ID:
             return
@@ -560,25 +485,27 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📊 Buyurtmalar: {count}\n💰 Jami: {total}"
         )
 
-    elif user_id != ADMIN_ID and context.user_data.get(USER_STEP) == "user_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
-
+    elif context.user_data.get("step") == "season":
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
-
-        # 🔥 faqat bitta fasl saqlanadi
-        context.user_data["filter_season"] = season
-
-        # 🔥 keyingi bosqich
-        context.user_data[USER_STEP] = "user_category"
-
-        # 🔥 darhol kategoriya chiqadi
-        keyboard = get_category_buttons(context)
-
+    
+        if "seasons" not in context.user_data:
+            context.user_data["seasons"] = []
+    
+        if season not in context.user_data["seasons"]:
+            context.user_data["seasons"].append(season)
+    
+        keyboard = [
+            ["☀️ Yozgi","❄️ Qishki"],
+            ["🌸 Bahor","🍂 Kuz"],
+            ["✅ Tayyor"]
+        ]
+    
         await update.message.reply_text(
-            "Kategoriya tanlang:",
+            f"Tanlangan: {', '.join(context.user_data['seasons'])}",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-        return    
-    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "category":
+    
+    elif context.user_data.get("step") == "category":
 
         category = text.split("(")[0]
         category = category.replace("👕","").replace("👖","").replace("🧥","") \
@@ -605,37 +532,27 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             category = "ichki kiyim"
 
         context.user_data["category"] = category
-        context.user_data[ADMIN_STEP] = "name"
+        context.user_data["step"] = "name"
 
         await update.message.reply_text("Nomini yozing:")
         return
-    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "name":
+    elif context.user_data.get("step") == "name":
         context.user_data["name"] = text
-        context.user_data[ADMIN_STEP] = "size"
+        context.user_data["step"] = "size"
 
         keyboard = [["75-80","80-85","85-90"],["90-95","95-100","100-105","105-110"],["110-115","115-120","120-125","125-130"],["🔙 Orqaga", "🏠 Bosh menyu"]]
         await update.message.reply_text("O‘lcham:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return
-    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "size":
+    elif context.user_data.get("step") == "size":
         context.user_data["size"] = text.replace(" ", "")
-        context.user_data[ADMIN_STEP] = "price"
+        context.user_data["step"] = "price"
 
         await update.message.reply_text("Narx:")
         return
-    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "price":
+    elif context.user_data.get("step") == "price":
         context.user_data["price"] = text
-        context.user_data[ADMIN_STEP] = "count"
 
-        await update.message.reply_text("Nechta bor? (son kiriting)")
-        return
-
-    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "count":
-        try:
-            count = int(text)
-        except:
-            await update.message.reply_text("❌ Son kiriting")
-            return
-
+        # 🔥 SAQLAYMIZ
         products.append({
             "photo": context.user_data["photo"],
             "gender": context.user_data["gender"],
@@ -644,19 +561,20 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "name": context.user_data["name"],
             "size": context.user_data["size"],
             "price": context.user_data["price"],
-            "count": count,
-            "reserved": 0
+            "count": 1,
+            "reserved": 0 
         })
 
         save_products()
+
         context.user_data.clear()
 
         await update.message.reply_text("✅ Qo‘shildi!")
         return
-    elif user_id == ADMIN_ID and context.user_data.get(ADMIN_STEP) == "size_filter" and "-" in text:
+    elif context.user_data.get("step") == "size_filter" and "-" in text:
         size = text.replace(" ", "")
         context.user_data["filter_size"] = size
-        context.user_data[ADMIN_STEP] = "size_season"
+        context.user_data["step"] = "size_season"
 
         keyboard = [
             ["☀️ Yozgi","❄️ Qishki"],
@@ -671,27 +589,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ===== USER FLOW =====
     elif text == "🛍 Kiyimlar":
+        context.user_data.clear() 
+        keyboard = [["👦 O‘g‘il", "👧 Qiz"],["🔙 Orqaga", "🏠 Bosh menyu"]]
+        await update.message.reply_text("Tanlang:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
-        context.user_data.clear()
-
-        # 🔥 ADMIN HAM USER HAM BIR XIL BOSHLAYDI
-        context.user_data[USER_STEP] = "gender"
-
-        keyboard = [
-            ["👦 O‘g‘il", "👧 Qiz"],
-            ["🔙 Orqaga", "🏠 Bosh menyu"]
-        ]
-
-        await update.message.reply_text(
-            "Kim uchun:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
-        return
     # 👦 / 👧
-    elif text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get(USER_STEP) == "gender":
+    elif text in ["👦 O‘g‘il", "👧 Qiz"]:
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["filter_gender"] = gender
-        context.user_data[USER_STEP] = "choose_type"
+        context.user_data["step"] = "choose_type"
 
         keyboard = [
             ["📏 Razmer bo‘yicha", "📂 Umumiy"],
@@ -702,9 +608,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Qanday qidirasiz?",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-    elif user_id != ADMIN_ID and context.user_data.get(USER_STEP) == "choose_type" and text == "📏 Razmer bo‘yicha":
 
-        context.user_data[USER_STEP] = "size_filter"
+    elif text == "📏 Razmer bo‘yicha":
+
+        context.user_data["step"] = "size_filter"
 
         keyboard = [
             ["75-80","80-85","85-90"],
@@ -717,42 +624,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📏 Razmer tanlang:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
+    elif text == "📂 Umumiy":
 
-    elif context.user_data.get(USER_STEP) == "size_filter" and "-" in text:
-
-        size = text.replace(" ", "")
-        context.user_data["filter_size"] = size
-        context.user_data[USER_STEP] = "size_season"
-
-        keyboard = [
-            ["☀️ Yozgi","❄️ Qishki"],
-            ["🌸 Bahor","🍂 Kuz"],
-            ["🔙 Orqaga", "🏠 Bosh menyu"]
-        ]
-
-        await update.message.reply_text(
-            "Fasl tanlang:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
-        return
-
-    elif context.user_data.get(USER_STEP) == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
-
-        season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
-        context.user_data["filter_season"] = season
-        context.user_data[USER_STEP] = "size_category"
-
-        keyboard = get_category_buttons(context)
-
-        await update.message.reply_text(
-            "Kategoriya tanlang:",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
-        return
-
-    elif user_id != ADMIN_ID and context.user_data.get(USER_STEP) == "choose_type" and text == "📂 Umumiy":
-
-        context.user_data[USER_STEP] = "user_season"
+        context.user_data["step"] = "user_season"
 
         keyboard = [
             ["☀️ Yozgi","❄️ Qishki"],
@@ -769,14 +643,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         cart = carts.get(user_id, {})
             # 🔥 SHUNI QO‘SH
-        cart = {int(idx): item for idx, item in cart.items() if int(idx) < len(products)}
+        cart = {idx: item for idx, item in cart.items() if idx < len(products)}
         carts[user_id] = cart
+            import time
 
         now = time.time()
         new_cart = {}
 
         for idx, item in cart.items():
-            if now - item["time"] < 7:
+            if now - item["time"] < 7200:
                 new_cart[int(idx)] = item
             else:
                 products[int(idx)]["reserved"] = max(
@@ -797,7 +672,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for idx, item in cart.items():
             qty = item["qty"]
-            p = products[int(idx)]
+            p = products[idx]
             def parse_price(price_str):
                 return int(
                 price_str.lower()
@@ -821,9 +696,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg += f"{p['name']} x{qty} = {summa}\n"
 
             keyboard.append([
-                InlineKeyboardButton("➖", callback_data=f"minus_{idx}"),
-                InlineKeyboardButton(f"{qty}", callback_data="none"),
-                InlineKeyboardButton("➕", callback_data=f"plus_{idx}"),
                 InlineKeyboardButton("❌", callback_data=f"del_{idx}")
             ])
 
@@ -834,8 +706,20 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
     # 🌦 FASL
-       # 👕 KATEGORIYA → STOP (FAqat mahsulot chiqadi)
-    elif "(" in text and context.user_data.get(USER_STEP) == "user_category":
+    elif text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
+        season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
+        context.user_data["filter_season"] = season
+        context.user_data["step"] = "user_category"
+
+        keyboard = get_category_buttons(context)
+        await update.message.reply_text(
+            "Kategoriya tanlang:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return
+
+    # 👕 KATEGORIYA → STOP (FAqat mahsulot chiqadi)
+    elif "(" in text and context.user_data.get("step") == "user_category":
 
         category = text.split("(")[0]
         category = category.replace("👕","").replace("👖","").replace("🧥","") \
@@ -864,17 +748,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         found = False
 
         for i, p in enumerate(products):
-            if category.strip().lower() == p["category"].strip().lower():
+            if category in p["category"].strip().lower():
                 found = True
 
-                if update.message.from_user.id == ADMIN_ID:
-                    keyboard = [
-                        [InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{i}")]
-                    ]
-                else:
-                    keyboard = [
-                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
-                    ]
+                keyboard = [
+                    [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
+                ]
+
                 await update.message.reply_photo(
                     photo=p["photo"],
                     caption=f"{p['name']}\n{p['size']}\n{p['price']}",
@@ -940,10 +820,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, item in data["cart"].items():
             qty = item["qty"]
             products[int(idx)]["count"] -= qty
-            products[int(idx)]["reserved"] = max(
-                0,
-                products[int(idx)].get("reserved", 0) - qty
-            )
+            products[int(idx)]["reserved"] -= qty
 
         save_products()
 
@@ -1086,12 +963,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id not in carts:
             carts[user_id] = {}
     
+        # 🔒 QAYTA QO‘SHILMASIN
+        if idx in carts[user_id]:
+            await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
+            return
     
         # 🔥 mavjudligini tekshirish
         if product["count"] - product.get("reserved", 0) <= 0:
             await query.answer("❌ Mahsulot qolmagan!", show_alert=True)
             return
-      
+    
+        # 🔥 savat yo‘q bo‘lsa yaratamiz
+        if user_id not in carts:
+            carts[user_id] = {}
+    
+        import time
+    
         # 🔥 AGAR OLDIN QO‘SHILGAN BO‘LSA — QAYTA QO‘SHMA
         if idx in carts[user_id]:
             await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
@@ -1114,42 +1001,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Savatga qo‘shildi!",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-    elif data.startswith("plus_"):
-        idx = int(data.split("_")[1])
-    
-        if idx not in carts[user_id]:
-            return
-    
-        product = products[idx]
-    
-        # 🔥 ENG TO‘G‘RI HISOB
-        available = product["count"] - product.get("reserved", 0)
-    
-        if available <= 0:
-            await query.answer("❌ Mahsulot tugagan", show_alert=True)
-            return
-    
-        carts[user_id][idx]["qty"] += 1
-        products[idx]["reserved"] += 1
-    
-        save_products()
-        await update_cart_message(query, user_id)
-
-    elif data.startswith("minus_"):
-        idx = int(data.split("_")[1])
-    
-        if idx not in carts[user_id]:
-            return
-    
-        carts[user_id][idx]["qty"] -= 1
-        products[idx]["reserved"] = max(0, products[idx]["reserved"] - 1)
-    
-        if carts[user_id][idx]["qty"] <= 0:
-            carts[user_id].pop(idx)
-    
-        save_products()
-        await update_cart_message(query, user_id)    
-        
     elif data == "clear_yes":
         if query.from_user.id != ADMIN_ID:
             return
@@ -1179,6 +1030,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data == "clear_no":
         await query.message.reply_text("❌ Bekor qilindi")
+
+    elif data.startswith("plus_"):
+        idx = int(data.split("_")[1])
+        product = products[idx]
+
+        # 🔥 TEKSHIRUV
+        if product["count"] - product.get("reserved", 0) <= 0:
+            await query.answer("❌ Yetarli mahsulot yo‘q", show_alert=True)
+            return
+
+        carts[user_id][idx]["qty"] += 1
+        carts[user_id][idx]["time"] = time.time()
+
+        product["reserved"] += 1
+        save_products()
+
+        await query.answer("➕ Qo‘shildi")
 
     elif data.startswith("send_"):
         order_id = data.split("_")[1]
@@ -1308,10 +1176,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             qty = item["qty"]
 
             products[int(idx)]["count"] += qty
-            products[int(idx)]["reserved"] = max(
-                0,
-                products[int(idx)].get("reserved", 0) - qty
-            )   # 🔥 MUHIM
+            products[int(idx)]["reserved"] -= qty   # 🔥 MUHIM
 
         save_products()
 
@@ -1346,10 +1211,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, item in order["cart"].items():
             qty = item["qty"]
             products[int(idx)]["count"] += qty
-            products[int(idx)]["reserved"] = max(
-                0,
-                products[int(idx)].get("reserved", 0) - qty
-            )
+            products[int(idx)]["reserved"] -= qty
 
         save_products()
 
@@ -1508,11 +1370,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = query.from_user.id
         cart = carts.get(user_id, {})
 
+        import time
         now = time.time()
         new_cart = {}
 
         for idx, item in cart.items():
-            if now - item["time"] < 7:
+            if now - item["time"] < 7200:
                 new_cart[int(idx)] = item
             else:
                 products[int(idx)]["reserved"] = max(
@@ -1562,28 +1425,63 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🔙 Orqaga", callback_data="back")
         ])
 
-        await update_cart_message(query, user_id)
+        await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data.startswith("del_"):
         idx = int(data.split("_")[1])
-    
+
         user_id = query.from_user.id
         cart = carts.get(user_id, {})
-    
+
         if idx in cart:
             qty = cart[idx]["qty"]
-    
             products[idx]["reserved"] = max(
                 0,
                 products[idx].get("reserved", 0) - qty
             )
-    
             cart.pop(idx)
+
             save_products()
-    
+
         await query.answer("❌ O‘chirildi")
-    
-        await update_cart_message(query, user_id)
+
+        # 🔥 SAVATNI QAYTA CHIQARAMIZ
+        if not cart:
+            await query.message.reply_text("🧺 Savat bo‘sh")
+            return
+
+        msg = "🧺 Savat:\n\n"
+        total = 0
+        keyboard = []
+
+        for i, item in cart.items():
+            qty = item["qty"]
+            p = products[int(i)]
+
+            price = int(
+                p["price"].lower()
+                .replace("ming", "000")
+                .replace("so'm", "")
+                .replace("soʻm", "")
+                .replace(" ", "")
+            )
+
+            summa = price * qty
+            total += summa
+
+            msg += f"{p['name']} x{qty} = {summa}\n"
+
+            keyboard.append([
+                InlineKeyboardButton("❌", callback_data=f"del_{i}")
+            ])
+
+        msg += f"\n💰 Jami: {total}"
+
+        keyboard.append([InlineKeyboardButton("🚚 Buyurtma berish", callback_data="checkout")])
+        keyboard.append([InlineKeyboardButton("🔙 Orqaga", callback_data="back")])
+
+        await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
     elif data == "checkout":
         context.user_data["order_step"] = "choose_type"
 
@@ -1603,6 +1501,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🏠 Bosh menyu",
             reply_markup=MAIN_MENU
             
+        )
+    elif data.startswith("confirm_"):
+        order_id = data.split("_")[1]
+        order = orders.get(order_id)
+
+        if not order:
+            return
+
+        user_id = order["user_id"]
+
+        # USERGA
+        await context.bot.send_message(
+            chat_id=user_id,
+            text="📦 Buyurtmangiz tayyor!\n🕒 Kelishilgan vaqtda olib ketishingiz mumkin."
         )
 
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1698,10 +1610,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, item in data["cart"].items():
             qty = item["qty"]
             products[int(idx)]["count"] -= qty
-            products[int(idx)]["reserved"] = max(
-                0,
-                products[int(idx)].get("reserved", 0) - qty
-            )
+            products[int(idx)]["reserved"] -= qty
 
         save_products()
 # ===== USERGA MAHSULOT =====
@@ -1802,12 +1711,15 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"📦 Pickup tayyor\nID: {order_id}"
         )
 
+        await query.answer("Tasdiqlandi")
     # ===== TOZALASH =====
         carts[user_id] = {}
         context.user_data.clear()
 
 # Application'ni qurishda quyidagi tartibda qo'shing:
+
 app = ApplicationBuilder().token(TOKEN).build()
+
 app.add_handler(CommandHandler("start", start))
 
 app.add_handler(MessageHandler(filters.PHOTO, photo_handler))
@@ -1826,5 +1738,4 @@ for p in products:
 
     if isinstance(p.get("season"), str):
         p["season"] = [p["season"]]
-
 app.run_polling()
