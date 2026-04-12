@@ -748,7 +748,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         found = False
 
         for i, p in enumerate(products):
-            if category in p["category"].strip().lower():
+            if category.strip().lower() == p["category"].strip().lower():
                 found = True
 
                 if update.effective_user.id == ADMIN_ID:
