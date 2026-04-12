@@ -285,10 +285,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ):
                 found = True
 
-                keyboard = [
-                    [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
-                ]
-
+                if update.effective_user.id == ADMIN_ID:
+                    keyboard = [
+                        [InlineKeyboardButton("❌ O‘chirish", callback_data=f"delete_{i}")]
+                    ]
+                else:
+                    keyboard = [
+                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
+                    ]
                 await update.message.reply_photo(
                     photo=p["photo"],
                     caption=f"{p['name']}\n{p['size']}\n{p['price']}",
@@ -743,9 +747,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if category in p["category"].strip().lower():
                 found = True
 
-                keyboard = [
-                    [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
-                ]
+                if update.effective_user.id == ADMIN_ID:
+                    keyboard = [
+                        [InlineKeyboardButton("❌ O‘chirish", callback_data=f"delete_{i}")]
+                    ]
+                else:
+                    keyboard = [
+                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
+                    ]
 
                 await update.message.reply_photo(
                     photo=p["photo"],
@@ -839,11 +848,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=MAIN_MENU
             )
 
-            await context.bot.send_location(
-                chat_id=user_id,
-                latitude=39.690149,
-                longitude=66.824828
-            )
+            #await context.bot.send_location(
+             #   chat_id=user_id,
+              #  latitude=39.690149,
+               # longitude=66.824828
+            #)
 
             await update.message.reply_text(
                 "🏠 Bosh menyu",
@@ -993,6 +1002,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Savatga qo‘shildi!",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+
+    elif data.startswith("delete_"):
+        if query.from_user.id != ADMIN_ID:
+            return
+
+        idx = int(data.split("_")[1])
+
+        if idx < len(products):
+            products.pop(idx)
+            save_products()
+
+            await query.message.reply_text("✅ Mahsulot o‘chirildi")
+
     elif data == "clear_yes":
         if query.from_user.id != ADMIN_ID:
             return
@@ -1658,15 +1680,16 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # USER GA MANZIL
             await update.message.reply_text(
-                "📍 Olib ketish manzili:\nSamarqand, Pastdarg‘om, Charxin\n📞 +998915388499"
+                "📍 Olib ketish manzili:\nSamarqand, Pastdarg‘om, Charxin\n 
+                A'loqa 📞 +998915388499  Adminlar o'zlari a'loqaga chiqishadi va manzilni yetgazishadi. " 
                 
             )
 
-            await context.bot.send_location(
-                chat_id=user_id,
-                latitude=39.690149,
-                longitude=66.824828
-            )
+            #await context.bot.send_location(
+             #   chat_id=user_id,
+              #  latitude=39.690149,
+               # longitude=66.824828
+            #)
 
             await update.message.reply_text(
                 "🏠 Bosh menyu",
