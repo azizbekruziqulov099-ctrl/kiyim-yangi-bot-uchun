@@ -751,10 +751,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if category in p["category"].strip().lower():
                 found = True
 
-                keyboard = [
-                    [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
-                ]
-
+                if update.effective_user.id == ADMIN_ID:
+                    keyboard = [
+                        [InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{i}")]
+                    ]
+                else:
+                    keyboard = [
+                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
+                    ]
                 await update.message.reply_photo(
                     photo=p["photo"],
                     caption=f"{p['name']}\n{p['size']}\n{p['price']}",
