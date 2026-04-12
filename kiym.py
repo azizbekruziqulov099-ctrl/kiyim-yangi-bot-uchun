@@ -285,14 +285,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ):
                 found = True
 
-                if update.effective_user.id == ADMIN_ID:
-                    keyboard = [
-                        [InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{i}")]
-                    ]
-                else:
-                    keyboard = [
-                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
-                    ]
+                keyboard = [
+                    [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
+                ]
 
                 await update.message.reply_photo(
                     photo=p["photo"],
@@ -642,10 +637,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "🧺 Savat":
         user_id = update.effective_user.id
         cart = carts.get(user_id, {})
-            # 🔥 SHUNI QO‘SH
-        cart = {idx: item for idx, item in cart.items() if idx < len(products)}
-        carts[user_id] = cart
-            import time
+        import time
 
         now = time.time()
         new_cart = {}
@@ -1007,27 +999,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         products.clear()
         save_products()
-        carts.clear()   # 🔥 SHUNI QO‘SH
 
         await query.message.reply_text("✅ Barcha mahsulotlar o‘chirildi")
-        
-    elif data.startswith("delete_"):
-        if query.from_user.id != ADMIN_ID:
-            return
-    
-        idx = int(data.split("_")[1])
-    
-        if idx >= len(products):
-            await query.answer("❌ Topilmadi")
-            return
-    
-        products.pop(idx)
-        save_products()
-    
-        carts.clear()   # 🔥 MUHIM (bug bo‘lmasligi uchun)
-    
-        await query.message.reply_text("🗑 Mahsulot o‘chirildi")
-    
+
     elif data == "clear_no":
         await query.message.reply_text("❌ Bekor qilindi")
 
