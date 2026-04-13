@@ -278,11 +278,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         found = False
 
         for i, p in enumerate(products):
-            if (
-                p["size"] == context.user_data.get("filter_size")
-                and category == p["category"].lower()
-                and (p["count"] - p.get("reserved", 0)) > 0
-            ):
+                
+            if filter_check(p, context) and category == p["category"].lower():
                 found = True
 
                 if update.effective_user.id == ADMIN_ID:
