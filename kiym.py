@@ -18,19 +18,19 @@ order_id_counter = 1
 
 def get_category_buttons(context):
     return [
-        [f"👕 2 talik ({count_products(lambda p: p['category'].lower()=='2 talik kiyim')})",
-         f"👕 3 talik ({count_products(lambda p: p['category'].lower()=='3 talik kiyim')})"],
+        [f"👕 2 talik ({count_products(context,lambda p: p['category'].lower()=='2 talik kiyim')})",
+         f"👕 3 talik ({count_products(context,lambda p: p['category'].lower()=='3 talik kiyim')})"],
 
-        [f"👕 Futbolka ({count_products(lambda p: p['category'].lower()=='futbolka')})",
-         f"👖 Shim ({count_products(lambda p: p['category'].lower()=='shim')})"],
+        [f"👕 Futbolka ({count_products(context,lambda p: p['category'].lower()=='futbolka')})",
+         f"👖 Shim ({count_products(context,lambda p: p['category'].lower()=='shim')})"],
 
-        [f"🧥 Qalin ({count_products(lambda p: p['category'].lower()=='qalin kiyim')})",
-         f"🩳 Shortik ({count_products(lambda p: p['category'].lower()=='shortik')})"],
+        [f"🧥 Qalin ({count_products(context,lambda p: p['category'].lower()=='qalin kiyim')})",
+         f"🩳 Shortik ({count_products(context,lambda p: p['category'].lower()=='shortik')})"],
 
-        [f"👟 Oyoq ({count_products(lambda p: p['category'].lower()=='oyoq kiyim')})",
-         f"🧢 Bosh ({count_products(lambda p: p['category'].lower()=='bosh kiyim')})"],
+        [f"👟 Oyoq ({count_products(context,lambda p: p['category'].lower()=='oyoq kiyim')})",
+         f"🧢 Bosh ({count_products(context,lambda p: p['category'].lower()=='bosh kiyim')})"],
 
-        [f"🩲 Ichki ({count_products(lambda p: p['category'].lower()=='ichki kiyim')})"],
+        [f"🩲 Ichki ({count_products(context,lambda p: p['category'].lower()=='ichki kiyim')})"],
 
         ["🔙 Orqaga", "🏠 Bosh menyu"]
     ]
@@ -66,13 +66,15 @@ def filter_check(p, context):
 
     return True
 
-def count_products(filter_func=None):
+def count_products(context, filter_func=None):
     total = 0
     for p in products:
         available = p["count"] - p.get("reserved", 0)
-        if available > 0:
+
+        if available > 0 and filter_check(p, context):
             if not filter_func or filter_func(p):
                 total += available
+
     return total
 
 def save_products():
@@ -278,8 +280,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         found = False
 
         for i, p in enumerate(products):
-                
-            if filter_check(p, context) and category == p["category"].lower():
+            if (
+                p["size"] == context.user_data.get("filter_size")
+                and category == p["category"].lower()
+                and (p["count"] - p.get("reserved", 0)) > 0
+            ):
                 found = True
 
                 if update.effective_user.id == ADMIN_ID:
