@@ -1090,6 +1090,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import time
     print("BUTTON ISHLADI")
     query = update.callback_query
     await query.answer()
