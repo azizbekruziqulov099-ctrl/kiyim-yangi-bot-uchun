@@ -398,7 +398,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = 0
         for idx, item in cart.items():
             qty = item["qty"]
-            p = next((x for x in products if x["id"] == idx), None)
+            p = next((x for x in products if x["id"] == int(idx)), None)
             if not p:
                 continue
 
@@ -439,7 +439,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = 0
         for idx, item in cart.items():
             qty = item["qty"]
-            p = next((x for x in products if x["id"] == idx), None)
+            p = next((x for x in products if x["id"] == int(idx)), None)
             if not p:
                 continue
 
@@ -963,7 +963,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ===== USERGA MAHSULOT =====
         for idx, item in data["cart"].items():
-            p = next((x for x in products if x["id"] == idx), None)
+            p = next((x for x in products if x["id"] == int(idx)), None)
             if not p:
                 continue
             qty = item["qty"]
@@ -1008,7 +1008,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ===== ADMINGA MAHSULOT =====
         for idx, item in data["cart"].items():
-            p = next((x for x in products if x["id"] == idx), None)
+            p = next((x for x in products if ), None)
             if not p:
                 continue
             qty = item["qty"]
@@ -1048,7 +1048,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = 0
         for idx, item in cart.items():
             qty = item["qty"]
-            p = next((x for x in products if x["id"] == idx), None)
+            p = next((x for x in products if x["id"] == int(idx)), None)
             if not p:
                 continue
 
@@ -1511,7 +1511,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for idx, item in cart.items():
             if now - item["time"] < 7200:
-                new_cart[int(idx)] = item
+                new_cart[idx] = item
             else:
                 # 🔒 faqat agar savatda hali bo‘lsa kamaytiradi
                 if int(idx) in cart:
@@ -1539,7 +1539,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for idx, item in cart.items():
             qty = item["qty"]
-            p = next((x for x in products if x["id"] == idx), None)
+            p = next((x for x in products if x["id"] == int(idx)), None)
             if not p:
                 continue
 
@@ -1569,7 +1569,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🔙 Orqaga", callback_data="back")
         ])
 
-        await query.message.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data.startswith("del_"):
         product_id = int(data.split("_")[1])
@@ -1688,7 +1688,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for idx, item in cart.items():
         qty = item["qty"]
-        p = next((x for x in products if x["id"] == idx), None)
+        p = next((x for x in products if x["id"] == int(idx)), None)
         if not p:
             continue
 
@@ -1773,7 +1773,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         #save_products()
 # ===== USERGA MAHSULOT =====
         for idx, item in data["cart"].items():
-            p = next((x for x in products if x["id"] == idx), None)
+            p = next((x for x in products if x["id"] == int(idx)), None)
             if not p:
                 continue
             qty = item["qty"]
@@ -1786,7 +1786,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ===== ADMINGA MAHSULOT =====
         for idx, item in data["cart"].items():
-            p = next((x for x in products if x["id"] == idx), None)
+            p = next((x for x in products if x["id"] == int(idx)), None)
             if not p:
                 continue
             qty = item["qty"]
