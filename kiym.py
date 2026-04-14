@@ -6,7 +6,11 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler
 import asyncio
 import os
+import psycopg2
+DATABASE_URL = os.getenv("DATABASE_URL")
 
+conn = psycopg2.connect(DATABASE_URL)
+cur = conn.cursor()
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
@@ -75,7 +79,28 @@ def filter_check(p, context):
             return False
 
     return True
+def load_products_from_db():
+    global products
 
+    cur.execute("SELECT * FROM products")
+    rows = cur.fetchall()
+
+    products = []
+
+    for r in rows:
+        products.append({
+            "id": r[0],
+            "photo": r[1],
+            "gender": r[2],
+            "origin": r[3],
+            "season": r[4].split(",") if r[4] else [],
+            "category": r[5],
+            "name": r[6],
+            "size": r[7],
+            "price": r[8],
+            "count": r[9],
+            "reserved": r[10]
+        })
 def count_products(context, filter_func=None):
     total = 0
     for p in products:
