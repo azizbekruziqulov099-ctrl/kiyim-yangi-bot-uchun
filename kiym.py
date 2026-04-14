@@ -569,7 +569,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         cur.execute("SELECT COUNT(*) FROM orders")
         count = cur.fetchone()[0]
-        total = sum(o["total"] for o in orders)
+        cur.execute("SELECT SUM(total) FROM orders")
+        total = cur.fetchone()[0] or 0
 
         await update.message.reply_text(
             f"📊 Buyurtmalar: {count}\n💰 Jami: {total}"
@@ -1372,6 +1373,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Bekor qilindi")
 
     elif data.startswith("delivered_"):
+        order_id = data.split("_")[1]
+
         cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
         row = cur.fetchone()
 
@@ -1379,11 +1382,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         user_id = row[0]
-
-        if not order:
-            return
-
-        user_id = order["user_id"]
 
         # USER ga
         await context.bot.send_message(
@@ -1391,19 +1389,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"📦 Buyurtma yetkazildi!\n🆔 ID: {order_id}"
         )
 
-        # ADMIN ga ham qayta yozamiz
+        # ADMIN ga
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=f"📦 Yetkazildi\nID: {order_id}"
         )
 
-        # STATUS
-        order["status"] = "📦 Yetkazildi"
-       # save_orders()
-
         await query.answer("Yetkazildi")
-
     elif data.startswith("paid_"):
+        order_id = data.split("_")[1]
+
         cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
         row = cur.fetchone()
 
@@ -1411,11 +1406,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         user_id = row[0]
-
-        if not order:
-            return
-
-        user_id = order["user_id"]
 
         # USER ga
         await context.bot.send_message(
@@ -1429,12 +1419,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"💰 To‘lov olindi\nID: {order_id}"
         )
 
+        # ORDERNI O‘CHIRAMIZ
         cur.execute("DELETE FROM orders WHERE id=%s", (order_id,))
         conn.commit()
 
         await query.answer("To‘lov olindi")
 
     elif data.startswith("accept_"):
+        order_id = data.split("_")[1]
+
         cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
         row = cur.fetchone()
 
@@ -1443,40 +1436,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         user_id = row[0]
 
-        if not order:
-            return
-
-        user_id = order["user_id"]
-
-        # 🔥 ADMIN MA’LUMOTI (O‘ZINGNI YOZ)
+        # 🔥 ADMIN MA’LUMOTI
         ADMIN_PHONE = "+998915388499"
-        ADDRESS = "Samarqand vil. Pastdarg'om tum. charxin shax. charos ko‘chasi 53 uy "
+        ADDRESS = "Samarqand vil. Pastdarg'om tum. charxin shax. charos ko‘chasi 53 uy Adminlar aloqaga chiqishadi va olib ketish vaqtini keishiladi."
 
         LAT = 39.690149
         LON = 66.824828
 
-        # 📞 + 🏠 USERGA YUBORISH
+        # USERGA
         await context.bot.send_message(
             chat_id=user_id,
-            text=f"✅ Buyurtmangiz qabul qilindi! Adminlar tez orada aloqaga chiqishadi.\n\n📞 Tel: {ADMIN_PHONE}\n🏠 Manzil: {ADDRESS}"
+            text=f"✅ Buyurtmangiz qabul qilindi!\n\n📞 Tel: {ADMIN_PHONE}\n🏠 Manzil: {ADDRESS}"
         )
 
-        # 📍 LOKATSIYA YUBORISH
         await context.bot.send_location(
             chat_id=user_id,
             latitude=LAT,
             longitude=LON
         )
 
-        # ADMINGA XABAR
+        # ADMIN ga
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=f"✅ BUYURTMA QABUL QILINDI\nID: {order_id}"
         )
 
         await query.answer("Yuborildi")
-
     elif data.startswith("contact_"):
+        order_id = data.split("_")[1]
+
         cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
         row = cur.fetchone()
 
@@ -1484,11 +1472,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         user_id = row[0]
-
-        if not order:
-            return
-
-        user_id = order["user_id"]
 
         await context.bot.send_message(
             chat_id=user_id,
@@ -1497,12 +1480,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(
             chat_id=ADMIN_ID,
-            text=f"📞 Mijoz bilan 10 min ichida aloqalashing\nID: {order_id}"
+            text=f"📞 Mijoz bilan bog‘laning\nID: {order_id}"
         )
 
-
-        await query.answer("Mijozga yuborildi")
+        await query.answer("Yuborildi")
     elif data.startswith("picked_"):
+        order_id = data.split("_")[1]
+
         cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
         row = cur.fetchone()
 
@@ -1510,11 +1494,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         user_id = row[0]
-
-        if not order:
-            return
-
-        user_id = order["user_id"]
 
         await context.bot.send_message(
             chat_id=user_id,
@@ -1526,10 +1505,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"📦 BUYURTMA YAKUNLANDI\nID: {order_id}"
         )
 
-        orders.pop(str(order_id))
-       # save_orders()
+        # 🔥 ORDERNI O‘CHIRAMIZ
+        cur.execute("DELETE FROM orders WHERE id=%s", (order_id,))
+        conn.commit()
 
-# ===== SAVAT SYSTEMA (YANGI) =====
+        await query.answer("Yakunlandi")
 
     elif data == "go_cart":
         user_id = query.from_user.id
