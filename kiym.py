@@ -1102,6 +1102,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("add_"):
         product_id = int(data.split("_")[1])
 
+        # 🔥 HAR SAFAR YANGILA
+        load_products_from_db()
+
         product = next((x for x in products if x["id"] == product_id), None)
         if not product:
             await query.answer("❌ Topilmadi", show_alert=True)
@@ -1114,8 +1117,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id not in carts:
             carts[user_id] = {}
 
-        pid = str(product_id)   # 🔥 SHU MUHIM
+        pid = str(product_id)   # 🔥 ENG MUHIM
 
+        # 🔥 HAR DOIM STRING ISHLAT
         if pid in carts[user_id]:
             carts[user_id][pid]["qty"] += 1
         else:
@@ -1126,6 +1130,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         carts[user_id][pid]["time"] = time.time()
 
+        # 🔥 RESERVED UPDATE
         product["reserved"] = (product.get("reserved") or 0) + 1
 
         cur.execute(
@@ -1133,6 +1138,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (product["reserved"], product_id)
         )
         conn.commit()
+
         await query.answer("✅ Qo‘shildi")
         await query.message.reply_text("✅ Savatga qo‘shildi")
     elif data.startswith("delete_"):
