@@ -190,8 +190,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ===== ADD =====
     if data.startswith("add_"):
-        load_products_from_db()   # yoki load_products()
-
+    
         pid = data.split("_")[1]
 
         product = next((x for x in products if x["id"] == pid), None)
