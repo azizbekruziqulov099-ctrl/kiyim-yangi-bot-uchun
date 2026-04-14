@@ -1100,10 +1100,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data.startswith("add_"):
-        product_id = int(data.split("_")[1])
-
-        # 🔥 HAR SAFAR YANGILA
         load_products_from_db()
+
+        product_id = int(data.split("_")[1])
+        user_id = query.from_user.id
 
         product = next((x for x in products if x["id"] == product_id), None)
         if not product:
@@ -1114,12 +1114,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ Qolmagan", show_alert=True)
             return
 
+        # 🔥 SAVATNI 100% TO‘G‘RI QILAMIZ
         if user_id not in carts:
             carts[user_id] = {}
 
-        pid = str(product_id)   # 🔥 ENG MUHIM
+        pid = str(product_id)   # 🔥 DOIM STRING
 
-        # 🔥 HAR DOIM STRING ISHLAT
+        # 🔥 ESKI INT KEYLARNI TOZALAYDI
+        carts[user_id] = {str(k): v for k, v in carts[user_id].items()}
+
         if pid in carts[user_id]:
             carts[user_id][pid]["qty"] += 1
         else:
@@ -1132,7 +1135,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 🔥 RESERVED UPDATE
         product["reserved"] = (product.get("reserved") or 0) + 1
-
         cur.execute(
             "UPDATE products SET reserved = %s WHERE id = %s",
             (product["reserved"], product_id)
