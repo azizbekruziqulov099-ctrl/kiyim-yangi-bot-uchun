@@ -11,6 +11,37 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()
+cur.execute("""
+CREATE TABLE IF NOT EXISTS products (
+    id SERIAL PRIMARY KEY,
+    photo TEXT,
+    gender TEXT,
+    origin TEXT,
+    season TEXT,
+    category TEXT,
+    name TEXT,
+    size TEXT,
+    price TEXT,
+    count INTEGER,
+    reserved INTEGER
+)
+""")
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT,
+    cart TEXT,
+    location TEXT,
+    phone TEXT,
+    total INTEGER,
+    status TEXT,
+    time FLOAT
+)
+""")
+
+conn.commit()
+
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
