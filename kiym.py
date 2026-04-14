@@ -1094,6 +1094,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data.startswith("add_"):
+        now = time.time()
+        last_time = context.user_data.get("last_add_time", 0)
+
+        if now - last_time < 1:
+            await query.answer("⏳ Sekinroq bos", show_alert=False)
+            return
+
+        context.user_data["last_add_time"] = now
+
         product_id = int(data.split("_")[1])
 
         product = next((x for x in products if x["id"] == product_id), None)
@@ -1101,34 +1110,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ Topilmadi", show_alert=True)
             return
 
-        user_id = query.from_user.id
+        if product["count"] - product.get("reserved", 0) <= 0:
+            await query.answer("❌ Qolmagan", show_alert=True)
+            return
 
-        # 🔥 savat yo‘q bo‘lsa yaratamiz (AVVAL)
         if user_id not in carts:
             carts[user_id] = {}
 
-        # 🔒 DOUBLE CLICK
-        last = context.user_data.get("last_add")
-        if last == product_id:
-            return
-        context.user_data["last_add"] = product_id
-
-        # 🔒 QAYTA QO‘SHILMASIN
         if product_id in carts[user_id]:
-            await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
-            return
-
-        # 🔥 mavjudligini tekshirish
-        if product["count"] - product.get("reserved", 0) <= 0:
-            await query.answer("❌ Mahsulot qolmagan!", show_alert=True)
-            return
-
-        import time
-
-        carts[user_id][product_id] = {
-            "qty": 1,
-            "time": time.time()
-        }
+            carts[user_id][product_id]["qty"] += 1
+            carts[user_id][product_id]["time"] = time.time()
+        else:
+            carts[user_id][product_id] = {
+                "qty": 1,
+                "time": time.time()
+            }
 
         product["reserved"] = product.get("reserved", 0) + 1
 
