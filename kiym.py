@@ -1095,9 +1095,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data.startswith("add_"):
-        product_id = data.split("_")[1]
+        product_id = int(data.split("_")[1])
 
-        product = next((x for x in products if x["id"] == product_id), None)
+        product = next((x for x in products if x["id"] == int(product_id)), None)
         if not product:
             await query.answer("❌ Topilmadi", show_alert=True)
             return
@@ -1119,16 +1119,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         carts[user_id][product_id]["time"] = time.time()
 
-        # 🔥 MUHIM FIX (None bo‘lsa ham ishlaydi)
         product["reserved"] = (product.get("reserved") or 0) + 1
 
-        await query.answer("✅ Qo‘shildi")   # 🔥 shu ham bo‘lsin
+        await query.answer("✅ Qo‘shildi")
         await query.message.reply_text("✅ Savatga qo‘shildi")
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
 
-        product_id = data.split("_")[1]
+        product_id = int(data.split("_")[1])
 
         cur.execute("DELETE FROM products WHERE id=%s", (product_id,))
         conn.commit()
@@ -1151,9 +1150,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Bekor qilindi")
 
     elif data.startswith("plus_"):
-        product_id = data.split("_")[1]
+        product_id = int(data.split("_")[1])
 
-        product = next((x for x in products if x["id"] == product_id), None)
+        product = next((x for x in products if x["id"] == int(product_id)), None)
 
         if not product:
             return
@@ -1163,7 +1162,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ Yetarli mahsulot yo‘q", show_alert=True)
             return
 
-        product_id = data.split("_")[1]
+        product_id = int(data.split("_")[1])
 
         if product_id not in carts.get(user_id, {}):
             return
@@ -1584,7 +1583,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data.startswith("del_"):
-        product_id = data.split("_")[1]
+        product_id = int(data.split("_")[1])
 
         user_id = query.from_user.id
         cart = carts.get(user_id, {})
@@ -1592,7 +1591,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if product_id in cart:
             qty = cart[product_id]["qty"]
 
-            p = next((x for x in products if x["id"] == product_id), None)
+            p = next((x for x in products if x["id"] == int(product_id)), None)
             if p:
                 p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
