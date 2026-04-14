@@ -1097,7 +1097,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("add_"):
         product_id = int(data.split("_")[1])
 
-        product = next((x for x in products if x["id"] == int(product_id)), None)
+        product = next((x for x in products if x["id"] == product_id), None)
         if not product:
             await query.answer("❌ Topilmadi", show_alert=True)
             return
@@ -1109,15 +1109,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id not in carts:
             carts[user_id] = {}
 
-        if product_id in carts[user_id]:
-            carts[user_id][product_id]["qty"] += 1
+        pid = str(product_id)   # 🔥 SHU MUHIM
+
+        if pid in carts[user_id]:
+            carts[user_id][pid]["qty"] += 1
         else:
-            carts[user_id][product_id] = {
+            carts[user_id][pid] = {
                 "qty": 1,
                 "time": time.time()
             }
 
-        carts[user_id][product_id]["time"] = time.time()
+        carts[user_id][pid]["time"] = time.time()
 
         product["reserved"] = (product.get("reserved") or 0) + 1
 
@@ -1167,7 +1169,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if product_id not in carts.get(user_id, {}):
             return
 
-        carts[user_id][product_id]["qty"] += 1
+        
         carts[user_id][product_id]["time"] = time.time()
 
         product["reserved"] += 1
