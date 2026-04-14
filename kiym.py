@@ -1537,9 +1537,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = 0
         keyboard = []
 
-        for pid, item in cart.items():
+        for idx, item in cart.items():
+            try:
+                pid = int(idx)
+            except:
+                continue
+
+            p = next((x for x in products if x["id"] == pid), None)
+
+            if not p:
+                continue
+
             qty = item["qty"]
-            p = next((x for x in products if x["id"] == int(pid)), None)
+
+            price = int(
+                p["price"].lower()
+                .replace("ming", "000")
+                .replace("so'm", "")
+                .replace("soʻm", "")
+                .replace(" ", "")
+            )
+
+            summa = price * qty
+            total += summa
+
+            msg += f"{p['name']} x{qty} = {summa}\n"
+
+            keyboard.append([
+                InlineKeyboardButton(f"❌ {p['name']}", callback_data=f"del_{pid}")
+            ])
             if not p:
                 continue
 
