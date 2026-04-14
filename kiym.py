@@ -110,6 +110,7 @@ def filter_check(p, context):
             return False
 
     return True
+    
 def load_products_from_db():
     global products
 
@@ -203,6 +204,10 @@ CATEGORIES = [
     "🧢 Bosh kiyim",
     "🩲 Ichki kiyim"
 ]
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    load_products_from_db()   # 🔥 SHART
+
 # START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     load_products_from_db()
@@ -1123,6 +1128,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         product["reserved"] = (product.get("reserved") or 0) + 1
 
+        cur.execute(
+            "UPDATE products SET reserved = %s WHERE id = %s",
+            (product["reserved"], product_id)
+        )
+        conn.commit()
         await query.answer("✅ Qo‘shildi")
         await query.message.reply_text("✅ Savatga qo‘shildi")
     elif data.startswith("delete_"):
