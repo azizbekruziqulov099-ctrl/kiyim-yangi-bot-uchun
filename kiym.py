@@ -1008,7 +1008,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ===== ADMINGA MAHSULOT =====
         for idx, item in data["cart"].items():
-            p = next((x for x in products if ), None)
+            p = next((x for x in products if x["id"] == int(idx)), None)
             if not p:
                 continue
             qty = item["qty"]
