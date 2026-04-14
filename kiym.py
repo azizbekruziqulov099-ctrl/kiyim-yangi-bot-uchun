@@ -582,7 +582,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Narx:")
         return
     elif context.user_data.get("step") == "price":
-        context.user_data["price"] = text
+        price = text.replace(" ", "").replace("so'm","").replace("soʻm","")
+
+        if not price.isdigit():
+            await update.message.reply_text("❌ Faqat raqam yozing (masalan: 50000)")
+            return
+
+        price = int(price)
+        price = f"{price:,}".replace(",", " ")
+
+        context.user_data["price"] = price + " so‘m"
 
         # 🔥 SAQLAYMIZ
         products.append({
