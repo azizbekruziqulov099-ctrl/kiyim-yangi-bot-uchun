@@ -762,7 +762,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 new_cart[pid] = item
             else:
                 qty = item["qty"]
-                p = next((x for x in products if x["id"] == pid), None)
+                p = next((x for x in products if x["id"] == int(pid)), None)
                 if p:
                     p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
@@ -780,7 +780,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for pid, item in cart.items():
             qty = item["qty"]
 
-            p = next((x for x in products if x["id"] == pid), None)
+            p = next((x for x in products if x["id"] == int(pid)), None)
             if not p:
                 continue
 
@@ -1528,7 +1528,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 continue
 
-            p = next((x for x in products if x["id"] == pid), None)
+            p = next((x for x in products if x["id"] == int(pid)), None)
 
             if not p:
                 continue
@@ -1610,7 +1610,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for pid, item in cart.items():
             qty = item["qty"]
 
-            p = next((x for x in products if x["id"] == pid), None)
+            p = next((x for x in products if x["id"] == int(pid)), None)
             if not p:
                 continue
 
