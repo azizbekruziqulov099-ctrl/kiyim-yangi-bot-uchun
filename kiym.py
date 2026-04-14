@@ -745,32 +745,26 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
 
+
     elif text == "🧺 Savat":
         user_id = update.effective_user.id
         cart = carts.get(user_id, {})
-        import time
 
+        import time
         now = time.time()
         new_cart = {}
 
-        for idx, item in cart.items():
+        for pid, item in cart.items():
             if now - item["time"] < 7200:
-                new_cart[int(idx)] = item
+                new_cart[pid] = item
             else:
-                # 🔒 faqat agar savatda hali bo‘lsa kamaytiradi
-                if int(idx) in cart:
-                    qty = item["qty"]
+                qty = item["qty"]
+                p = next((x for x in products if x["id"] == pid), None)
+                if p:
+                    p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
-                    p = next((x for x in products if x["id"] == int(idx)), None)
-                    if p:
-                        p["reserved"] = max(0, p.get("reserved", 0) - qty)
-                    else:
-                        p = next((x for x in products if x["id"] == int(idx)), None)
-                        if p:
-                            p["reserved"] = max(0, p.get("reserved", 0) - qty)
         carts[user_id] = new_cart
         cart = new_cart
-       # save_products()
 
         if not cart:
             await update.message.reply_text("🧺 Savat bo‘sh")
@@ -780,35 +774,36 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = 0
         keyboard = []
 
-        for idx, item in cart.items():
+        for pid, item in cart.items():
             qty = item["qty"]
-            p = next((x for x in products if x["id"] == idx), None)
+
+            p = next((x for x in products if x["id"] == pid), None)
             if not p:
                 continue
-            def parse_price(price_str):
-                return int(
-                price_str.lower()
-        .replace("ming", "000")
-        .replace("mong", "000")
-        .replace("mimg", "000")
-        .replace("so'm", "")
-        .replace("ning", "000")
-        .replace("mung", "000")
-        .replace("mug", "000")
-        .replace("mig", "000")
-        .replace("min", "000")
-        .replace("soʻm", "")
-        .replace("som", "")
-        .replace(" ", "")
-    )
-            price = parse_price(p["price"])
+
+            price = int(
+                p["price"].lower()
+                .replace("ming", "000")
+                .replace("mong", "000")
+                .replace("mimg", "000")
+                .replace("so'm", "")
+                .replace("ning", "000")
+                .replace("mung", "000")
+                .replace("mug", "000")
+                .replace("mig", "000")
+                .replace("min", "000")
+                .replace("soʻm", "")
+                .replace("som", "")
+                .replace(" ", "")
+            )            
+
             summa = price * qty
             total += summa
 
             msg += f"{p['name']} x{qty} = {summa}\n"
 
             keyboard.append([
-                InlineKeyboardButton("❌", callback_data=f"del_{idx}")
+                InlineKeyboardButton("❌", callback_data=f"del_{pid}")
             ])
 
         msg += f"\n💰 Jami: {total}"
@@ -817,6 +812,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("🔙 Orqaga", callback_data="back")])
 
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
     # 🌦 FASL
     elif text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
@@ -1101,53 +1097,47 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         product_id = int(data.split("_")[1])
 
         product = next((x for x in products if x["id"] == product_id), None)
-
         if not product:
+            await query.answer("❌ Topilmadi", show_alert=True)
             return
-        product_id = product["id"]
+
         user_id = query.from_user.id
-    
+
+        # 🔥 savat yo‘q bo‘lsa yaratamiz (AVVAL)
+        if user_id not in carts:
+            carts[user_id] = {}
+
         # 🔒 DOUBLE CLICK
         last = context.user_data.get("last_add")
         if last == product_id:
             return
-
         context.user_data["last_add"] = product_id
-        
+
         # 🔒 QAYTA QO‘SHILMASIN
         if product_id in carts[user_id]:
             await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
             return
-    
+
         # 🔥 mavjudligini tekshirish
         if product["count"] - product.get("reserved", 0) <= 0:
             await query.answer("❌ Mahsulot qolmagan!", show_alert=True)
             return
-    
-        # 🔥 savat yo‘q bo‘lsa yaratamiz
-        if user_id not in carts:
-            carts[user_id] = {}
-  
-        # 🔥 YANGI QO‘SHISH
-        product_id = product["id"]
+
+        import time
 
         carts[user_id][product_id] = {
             "qty": 1,
             "time": time.time()
         }
-    
+
         product["reserved"] = product.get("reserved", 0) + 1
-        #save_products()
-    
-        keyboard = [
-            [InlineKeyboardButton("🧺 Savatga o‘tish", callback_data="go_cart")]
-        ]
-    
+
+        keyboard = [[InlineKeyboardButton("🧺 Savatga o‘tish", callback_data="go_cart")]]
+
         await query.message.reply_text(
-            "✅ Savatga qo‘shildi! 2soat ichida maxsulotni savatga oʻtib harid qilmasangiz, maxsulot savatdan oʻchadi",
+            "✅ Savatga qo‘shildi!",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
@@ -1590,19 +1580,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if product_id in cart:
             qty = cart[product_id]["qty"]
 
-            # 🔥 mahsulotni ID orqali topamiz
             p = next((x for x in products if x["id"] == product_id), None)
-
             if p:
                 p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
             cart.pop(product_id)
 
-            load_products_from_db()  # 🔥 MUHIM
-
         await query.answer("❌ O‘chirildi")
 
-        # 🔥 SAVATNI QAYTA CHIQARAMIZ
         if not cart:
             await query.message.reply_text("🧺 Savat bo‘sh")
             return
@@ -1614,7 +1599,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for pid, item in cart.items():
             qty = item["qty"]
 
-            # 🔥 ID bo‘yicha topamiz
             p = next((x for x in products if x["id"] == pid), None)
             if not p:
                 continue
