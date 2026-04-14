@@ -115,9 +115,6 @@ def load_orders():
         orders = {}
 
 
-# 🔥 ENG MUHIM QISM
-load_products()   
-load_orders()
 
 ADMIN_MENU = ReplyKeyboardMarkup(
     [
@@ -593,21 +590,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         context.user_data["price"] = price + " so‘m"
 
-        # 🔥 SAQLAYMIZ
-        products.append({
-            "photo": context.user_data["photo"],
-            "gender": context.user_data["gender"],
-            "origin": context.user_data["origin"],
-            "season": context.user_data.get("seasons", []),
-            "category": context.user_data["category"],
-            "name": context.user_data["name"],
-            "size": context.user_data["size"],
-            "price": context.user_data["price"],
-            "count": 1,
-            "reserved": 0 
-        })
+        # 🔥 DB GA SAQLAYDI
+        cur.execute("""
+        INSERT INTO products (photo, gender, origin, season, category, name, size, price, count, reserved)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            context.user_data["photo"],
+            context.user_data["gender"],
+            context.user_data["origin"],
+            ",".join(context.user_data.get("seasons", [])),
+            context.user_data["category"],
+            context.user_data["name"],
+            context.user_data["size"],
+            context.user_data["price"],
+            1,
+            0
+        ))
 
-        save_products()
+        conn.commit()
 
         context.user_data.clear()
 
@@ -704,7 +704,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         products[int(idx)]["reserved"] = 0
         carts[user_id] = new_cart
         cart = new_cart
-        save_products()
+       # save_products()
 
         if not cart:
             await update.message.reply_text("🧺 Savat bo‘sh")
@@ -873,23 +873,29 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         order_id = str(len(orders) + 1)
 
         # ===== ORDER =====
-        orders[order_id] = {
-            "user_id": user_id,
-            "cart": data["cart"],
-            "location": data["location"],
-            "phone": phone,
-            "total": data["total"],
-            "status": "new"
-        }
-        save_orders()
+        import json, time
 
+        cur.execute("""
+        INSERT INTO orders (user_id, cart, location, phone, total, status, time)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            user_id,
+            json.dumps(data["cart"]),
+            json.dumps(data["location"]),
+            phone,
+            data["total"],
+            "new",
+            time.time()
+        ))
+
+        conn.commit()
         # ===== MAHSULOTNI KAMAYTIRISH =====
         for idx, item in data["cart"].items():
             qty = item["qty"]
             products[int(idx)]["count"] -= qty
             products[int(idx)]["reserved"] -= qty
 
-        save_products()
+        #save_products()
 
         # ===== USERGA MAHSULOT =====
         for idx, item in data["cart"].items():
@@ -1059,7 +1065,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
     
         product["reserved"] = product.get("reserved", 0) + 1
-        save_products()
+        #save_products()
     
         keyboard = [
             [InlineKeyboardButton("🧺 Savatga o‘tish", callback_data="go_cart")]
@@ -1078,7 +1084,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if idx < len(products):
             products.pop(idx)
-            save_products()
+            #save_products()
 
             await query.message.reply_text("✅ Mahsulot o‘chirildi")
 
@@ -1087,7 +1093,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         products.clear()
-        save_products()
+       # save_products()
 
         await query.message.reply_text("✅ Barcha mahsulotlar o‘chirildi")
 
@@ -1107,7 +1113,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         carts[user_id][idx]["time"] = time.time()
 
         product["reserved"] += 1
-        save_products()
+        #save_products()
 
         await query.answer("➕ Qo‘shildi")
 
@@ -1241,7 +1247,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             products[int(idx)]["count"] += qty
             products[int(idx)]["reserved"] -= qty   # 🔥 MUHIM
 
-        save_products()
+       # save_products()
 
         user_id = order["user_id"]
 
@@ -1276,7 +1282,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             products[int(idx)]["count"] += qty
             products[int(idx)]["reserved"] -= qty
 
-        save_products()
+#        save_products()
 
         await context.bot.send_message(
             chat_id=ADMIN_ID,
@@ -1452,7 +1458,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         carts[user_id] = new_cart
         cart = new_cart
-        save_products()
+       # save_products()
 
         if not cart:
             await query.message.reply_text("🧺 Savat bo‘sh")
@@ -1510,7 +1516,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 products[idx]["reserved"] = 0
 
             cart.pop(idx)
-            save_products()
+          #  save_products()
 
         await query.answer("❌ O‘chirildi")
 
@@ -1665,23 +1671,29 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         order_id = str(len(orders) + 1)
 
         # ===== ORDER SAQLASH =====
-        orders[order_id] = {
-            "user_id": user_id,
-            "cart": data["cart"],
-            "location": data["location"],
-            "phone": phone,
-            "total": data["total"],
-            "status": "new"
-        }
-        save_orders()
+        import json, time
 
+        cur.execute("""
+        INSERT INTO orders (user_id, cart, location, phone, total, status, time)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            user_id,
+            json.dumps(data["cart"]),
+            json.dumps(data["location"]),
+            phone,
+            data["total"],
+            "new",
+            time.time()
+        ))
+
+        conn.commit()
         # ===== MAHSULOTNI KAMAYTIRISH =====
         for idx, item in data["cart"].items():
             qty = item["qty"]
             products[int(idx)]["count"] -= qty
             products[int(idx)]["reserved"] -= qty
 
-        save_products()
+        #save_products()
 # ===== USERGA MAHSULOT =====
         for idx, item in data["cart"].items():
             p = products[int(idx)]
@@ -1798,13 +1810,5 @@ app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle))
 
 app.add_handler(CallbackQueryHandler(button_handler))
 
-load_products()
-load_orders()
-
-for p in products:
-    if "reserved" not in p:
-        p["reserved"] = 0
-
-    if isinstance(p.get("season"), str):
-        p["season"] = [p["season"]]
+load_products_from_db()
 app.run_polling()
