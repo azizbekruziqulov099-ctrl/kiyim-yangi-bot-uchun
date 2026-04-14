@@ -750,6 +750,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     elif text == "🧺 Savat":
+        load_products_from_db()
         user_id = update.effective_user.id
         cart = carts.get(user_id, {})
 
