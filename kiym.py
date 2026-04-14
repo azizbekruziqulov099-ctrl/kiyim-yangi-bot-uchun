@@ -1094,15 +1094,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data.startswith("add_"):
-        now = time.time()
-        last_time = context.user_data.get("last_add_time", 0)
-
-        if now - last_time < 1:
-            await query.answer("⏳ Sekinroq bos", show_alert=False)
-            return
-
-        context.user_data["last_add_time"] = now
-
         product_id = int(data.split("_")[1])
 
         product = next((x for x in products if x["id"] == product_id), None)
@@ -1110,7 +1101,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ Topilmadi", show_alert=True)
             return
 
-        if product["count"] - product.get("reserved", 0) <= 0:
+        if product["count"] - (product.get("reserved") or 0) <= 0:
             await query.answer("❌ Qolmagan", show_alert=True)
             return
 
@@ -1119,21 +1110,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if product_id in carts[user_id]:
             carts[user_id][product_id]["qty"] += 1
-            carts[user_id][product_id]["time"] = time.time()
         else:
             carts[user_id][product_id] = {
                 "qty": 1,
                 "time": time.time()
             }
 
-        product["reserved"] = product.get("reserved", 0) + 1
+        carts[user_id][product_id]["time"] = time.time()
 
-        keyboard = [[InlineKeyboardButton("🧺 Savatga o‘tish", callback_data="go_cart")]]
+        product["reserved"] = (product.get("reserved") or 0) + 1
 
-        await query.message.reply_text(
-            "✅ Savatga qo‘shildi!",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await query.message.reply_text("✅ Qo‘shildi")
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
