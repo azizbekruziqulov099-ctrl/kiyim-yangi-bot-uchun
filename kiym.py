@@ -15,7 +15,12 @@ products = []
 carts = {}
 orders = {}
 order_id_counter = 1
-
+ORIGINS = [
+    "🇺🇿 Vodiy",
+    "🇨🇳 Xitoy",
+    "🇹🇷 Turkiya",
+    "🏭 8-mart fabrika"
+]
 def get_category_buttons(context):
     return [
         [f"👕 2 talik ({count_products(context,lambda p: p['category'].lower()=='2 talik kiyim')})",
@@ -63,6 +68,11 @@ def filter_check(p, context):
     # mavjudlik
     if (p["count"] - p.get("reserved", 0)) <= 0:
         return False
+
+    # origin filter
+    if context.user_data.get("filter_origin"):
+        if p.get("origin") != context.user_data.get("filter_origin"):
+            return False
 
     return True
 
@@ -177,15 +187,36 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") == "gender":
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["gender"] = gender
+
+        # 🔥 YANGI STEP
+        context.user_data["step"] = "origin"
+
+        keyboard = [
+            ["🇺🇿 Vodiy", "🇨🇳 Xitoy"],
+            ["🇹🇷 Turkiya", "🏭 8-mart fabrika"]
+        ]
+
+        await update.message.reply_text(
+            "Qaysi ishlab chiqarish:",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return
+        
+    elif context.user_data.get("step") == "origin":
+        origin = text.replace("🇺🇿 ", "").replace("🇨🇳 ", "").replace("🇹🇷 ", "").replace("🏭 ", "")
+        context.user_data["origin"] = origin
+
         context.user_data["seasons"] = []
         context.user_data["step"] = "season"
 
         keyboard = [["☀️ Yozgi", "❄️ Qishki"], ["🌸 Bahor", "🍂 Kuz"]]
+
         await update.message.reply_text(
             "Fasl tanlang:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-        return
+        return    
+
     elif text == "✅ Tayyor" and context.user_data.get("step") == "season":
         context.user_data["step"] = "category"
     
@@ -557,6 +588,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         products.append({
             "photo": context.user_data["photo"],
             "gender": context.user_data["gender"],
+            "origin": context.user_data["origin"],
             "season": context.user_data.get("seasons", []),
             "category": context.user_data["category"],
             "name": context.user_data["name"],
@@ -598,18 +630,19 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text in ["👦 O‘g‘il", "👧 Qiz"]:
         gender = text.replace("👦 ", "").replace("👧 ", "")
         context.user_data["filter_gender"] = gender
-        context.user_data["step"] = "choose_type"
+
+        context.user_data["step"] = "origin_select"
 
         keyboard = [
-            ["📏 Razmer bo‘yicha", "📂 Umumiy"],
+            ["🇺🇿 Vodiy", "🇨🇳 Xitoy"],
+            ["🇹🇷 Turkiya", "🏭 8-mart fabrika"],
             ["🔙 Orqaga", "🏠 Bosh menyu"]
         ]
 
         await update.message.reply_text(
-            "Qanday qidirasiz?",
+            "Qaysi ishlab chiqarish:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-
     elif text == "📏 Razmer bo‘yicha":
 
         context.user_data["step"] = "size_filter"
@@ -719,6 +752,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
+    
+    elif context.user_data.get("step") == "origin_select":
+        origin = text.replace("🇺🇿 ", "").replace("🇨🇳 ", "").replace("🇹🇷 ", "").replace("🏭 ", "")
+        context.user_data["filter_origin"] = origin
+
+        context.user_data["step"] = "choose_type"
+
+        keyboard = [
+            ["📏 Razmer bo‘yicha", "📂 Umumiy"],
+            ["🔙 Orqaga", "🏠 Bosh menyu"]
+        ]
+
+        await update.message.reply_text(
+            "Qanday qidirasiz?",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return
+
 
     # 👕 KATEGORIYA → STOP (FAqat mahsulot chiqadi)
     elif "(" in text and context.user_data.get("step") == "user_category":
