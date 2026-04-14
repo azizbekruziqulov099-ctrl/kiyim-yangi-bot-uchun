@@ -405,17 +405,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            price = int(
-                p["price"].lower()
-                .replace("ming", "000")
-                .replace("mong", "000")
-                .replace("ning", "000")
-                .replace("som", "")
-                .replace("mig", "000")
-                .replace("so'm", "")
-                .replace("soʻm", "")
-                .replace(" ", "")
-            )
+            price = int(''.join(filter(str.isdigit, p["price"])))
             total += price * qty
 
         final = total + 0
@@ -446,13 +436,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            price = int(
-                p["price"].lower()
-                .replace("ming", "000")
-                .replace("so'm", "")
-                .replace("soʻm", "")
-                .replace(" ", "")
-            )
+            price = int(''.join(filter(str.isdigit, p["price"])))
             total += price * qty
 
         delivery = 0
@@ -650,7 +634,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Faqat raqam yozing (masalan: 50000)")
             return
 
-        price = int(price)
+            price = int(''.join(filter(str.isdigit, p["price"])))
         price = f"{price:,}".replace(",", " ")
 
         context.user_data["price"] = price + " so‘m"
@@ -785,21 +769,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            price = int(
-                p["price"].lower()
-                .replace("ming", "000")
-                .replace("mong", "000")
-                .replace("mimg", "000")
-                .replace("so'm", "")
-                .replace("ning", "000")
-                .replace("mung", "000")
-                .replace("mug", "000")
-                .replace("mig", "000")
-                .replace("min", "000")
-                .replace("soʻm", "")
-                .replace("som", "")
-                .replace(" ", "")
-            )            
+            price = int(''.join(filter(str.isdigit, p["price"])))
 
             summa = price * qty
             total += summa
@@ -1056,13 +1026,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            price = int(
-                p["price"].lower()
-                .replace("ming", "000")
-                .replace("so'm", "")
-                .replace("soʻm", "")
-                .replace(" ", "")
-            )
+            price = int(''.join(filter(str.isdigit, p["price"])))
             total += price * qty
 
         context.user_data["temp_order"] = {
@@ -1536,13 +1500,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             qty = item["qty"]
 
-            price = int(
-                p["price"].lower()
-                .replace("ming", "000")
-                .replace("so'm", "")
-                .replace("soʻm", "")
-                .replace(" ", "")
-            )
+            price = int(''.join(filter(str.isdigit, p["price"])))
 
             summa = price * qty
             total += summa
@@ -1555,13 +1513,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            price = int(
-                p["price"].lower()
-                .replace("ming", "000")
-                .replace("so'm", "")
-                .replace("soʻm", "")
-                .replace(" ", "")
-            )
+            price = int(''.join(filter(str.isdigit, p["price"])))
 
             summa = price * qty
             total += summa
@@ -1615,13 +1567,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            price = int(
-                p["price"].lower()
-                .replace("ming", "000")
-                .replace("so'm", "")
-                .replace("soʻm", "")
-                .replace(" ", "")
-            )
+            pprice = int(''.join(filter(str.isdigit, p["price"])))
 
             summa = price * qty
             total += summa
@@ -1704,13 +1650,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not p:
             continue
 
-        price = int(
-            p["price"].lower()
-            .replace("ming", "000")
-            .replace("so'm", "")
-            .replace("soʻm", "")
-            .replace(" ", "")
-        )
+        pprice = int(''.join(filter(str.isdigit, p["price"])))
 
         total += price * qty
 
