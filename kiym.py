@@ -1,4 +1,5 @@
 import json
+import time
 from telegram import KeyboardButton
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
@@ -48,7 +49,6 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 product_locks = {}
 products = []
 carts = {}
-orders = {}
 order_id_counter = 1
 ORIGINS = [
     "🇺🇿 Vodiy",
@@ -157,18 +157,18 @@ def load_products():
         products = []
 
 
-def save_orders():
-    with open("orders.json", "w") as f:
-        json.dump(orders, f, indent=4)
+#def save_orders():
+ #   with open("orders.json", "w") as f:
+  #      json.dump(orders, f, indent=4)
 
 
-def load_orders():
-    global orders
-    try:
-        with open("orders.json", "r") as f:
-            orders = json.load(f)
-    except:
-        orders = {}
+#def load_orders():
+ #   global orders
+  #  try:
+   #     with open("orders.json", "r") as f:
+    #        orders = json.load(f)
+    #except:
+        
 
 
 
@@ -373,11 +373,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 if update.effective_user.id == ADMIN_ID:
                     keyboard = [
-                        [InlineKeyboardButton("❌ O‘chirish", callback_data=f"delete_{i}")]
+                        [InlineKeyboardButton("❌ O‘chirish", callback_data=f"delete_{p['id']}")]
                     ]
                 else:
                     keyboard = [
-                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
+                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
                     ]
                 await update.message.reply_photo(
                     photo=p["photo"],
@@ -567,7 +567,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_user.id != ADMIN_ID:
             return
 
-        count = len(orders)
+        cur.execute("SELECT COUNT(*) FROM orders")
+        count = cur.fetchone()[0]
         total = sum(o["total"] for o in orders)
 
         await update.message.reply_text(
@@ -759,10 +760,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if int(idx) in cart:
                     qty = item["qty"]
 
-                    if products[int(idx)].get("reserved", 0) >= qty:
-                        products[int(idx)]["reserved"] -= qty
+                    p = next((x for x in products if x["id"] == int(idx)), None)
+                    if p:
+                        p["reserved"] = max(0, p.get("reserved", 0) - qty)
                     else:
-                        products[int(idx)]["reserved"] = 0
+                        p = next((x for x in products if x["id"] == int(idx)), None)
+                        if p:
+                            p["reserved"] = max(0, p.get("reserved", 0) - qty)
         carts[user_id] = new_cart
         cart = new_cart
        # save_products()
@@ -777,7 +781,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for idx, item in cart.items():
             qty = item["qty"]
-            p = products[idx]
+            p = next((x for x in products if x["id"] == idx), None)
+            if not p:
+                continue
             def parse_price(price_str):
                 return int(
                 price_str.lower()
@@ -876,11 +882,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 if update.effective_user.id == ADMIN_ID:
                     keyboard = [
-                        [InlineKeyboardButton("❌ O‘chirish", callback_data=f"delete_{i}")]
+                        [InlineKeyboardButton("❌ O‘chirish", callback_data=f"delete_{p['id']}")]
                     ]
                 else:
                     keyboard = [
-                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{i}")]
+                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
                     ]
 
                 await update.message.reply_photo(
@@ -931,14 +937,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         user_id = update.effective_user.id
-        order_id = str(len(orders) + 1)
-
-        # ===== ORDER =====
-        import json, time
-
         cur.execute("""
         INSERT INTO orders (user_id, cart, location, phone, total, status, time)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
+        RETURNING id
         """, (
             user_id,
             json.dumps(data["cart"]),
@@ -949,20 +951,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             time.time()
         ))
 
+        order_id = str(cur.fetchone()[0])
         conn.commit()
+
         # ===== MAHSULOTNI KAMAYTIRISH =====
         for idx, item in data["cart"].items():
             qty = item["qty"]
-            products[int(idx)]["count"] -= qty
-            products[int(idx)]["reserved"] -= qty
+            p = next((x for x in products if x["id"] == int(idx)), None)
+            if p:
+                p["count"] -= qty
+                p["reserved"] -= qty
 
         #save_products()
 
         # ===== USERGA MAHSULOT =====
         for idx, item in data["cart"].items():
-        p = next((x for x in products if x["id"] == idx), None)
-        if not p:
-            continue
+            p = next((x for x in products if x["id"] == idx), None)
+            if not p:
+                continue
             qty = item["qty"]
 
             await context.bot.send_photo(
@@ -1091,22 +1097,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data.startswith("add_"):
-        idx = int(data.split("_")[1])
-        product = products[idx]
+        product_id = int(data.split("_")[1])
+
+        product = next((x for x in products if x["id"] == product_id), None)
+
+        if not product:
+            return
         product_id = product["id"]
         user_id = query.from_user.id
     
         # 🔒 DOUBLE CLICK
         last = context.user_data.get("last_add")
-        if last == idx:
+        if last == product_id:
             return
-        context.user_data["last_add"] = idx
-    
-        if user_id not in carts:
-            carts[user_id] = {}
-    
+
+        context.user_data["last_add"] = product_id
+        
         # 🔒 QAYTA QO‘SHILMASIN
-        if idx in carts[user_id]:
+        if product_id in carts[user_id]:
             await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
             return
     
@@ -1118,14 +1126,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 🔥 savat yo‘q bo‘lsa yaratamiz
         if user_id not in carts:
             carts[user_id] = {}
-    
-        import time
-    
-        # 🔥 AGAR OLDIN QO‘SHILGAN BO‘LSA — QAYTA QO‘SHMA
-        if idx in carts[user_id]:
-            await query.answer("⚠️ Bu mahsulot savatda bor", show_alert=True)
-            return
-    
+  
         # 🔥 YANGI QO‘SHISH
         product_id = product["id"]
 
@@ -1150,22 +1151,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if query.from_user.id != ADMIN_ID:
             return
 
-        idx = int(data.split("_")[1])
+        product_id = int(data.split("_")[1])
 
-        if idx < len(products):
-            product_id = products[idx]["id"]
+        cur.execute("DELETE FROM products WHERE id=%s", (product_id,))
+        conn.commit()
 
-            cur.execute("DELETE FROM products WHERE id=%s", (product_id,))
-            conn.commit()
-
-            load_products_from_db()  # 🔥 ENG MUHIM
+        load_products_from_db()
 
         await query.message.reply_text("✅ Mahsulot o‘chirildi")
     elif data == "clear_yes":
         if query.from_user.id != ADMIN_ID:
             return
 
-        products.clear()
+        cur.execute("DELETE FROM products")
+        conn.commit()
+        load_products_from_db()
        # save_products()
 
         await query.message.reply_text("✅ Barcha mahsulotlar o‘chirildi")
@@ -1174,16 +1174,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Bekor qilindi")
 
     elif data.startswith("plus_"):
-        idx = int(data.split("_")[1])
-        product = products[idx]
+        product_id = int(data.split("_")[1])
+
+        product = next((x for x in products if x["id"] == product_id), None)
+
+        if not product:
+            return
 
         # 🔥 TEKSHIRUV
         if product["count"] - product.get("reserved", 0) <= 0:
             await query.answer("❌ Yetarli mahsulot yo‘q", show_alert=True)
             return
 
-        carts[user_id][idx]["qty"] += 1
-        carts[user_id][idx]["time"] = time.time()
+        product_id = int(data.split("_")[1])
+
+        if product_id not in carts.get(user_id, {}):
+            return
+
+        carts[user_id][product_id]["qty"] += 1
+        carts[user_id][product_id]["time"] = time.time()
 
         product["reserved"] += 1
         #save_products()
@@ -1192,12 +1201,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("send_"):
         order_id = data.split("_")[1]
-        order = orders.get(order_id)
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
 
-        if not order:
+        if not row:
             return
 
-        user_id = order["user_id"]
+        user_id = row[0]
 
         # USERGA
         await context.bot.send_message(
@@ -1213,38 +1223,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.answer("Yuborildi")
 
-    elif data.startswith("confirm_"):
-        order_id = data.split("_")[1]
-        order = orders.get(order_id)
-
-        if not order:
-            await query.answer("Xatolik")
-            return
-
-        user_id = order["user_id"]
-
-        # USERGA
-        await context.bot.send_message(
-            chat_id=user_id,
-            text="📦 Buyurtmangiz tayyor!\n🕒 Kelishilgan vaqtda olib ketishingiz mumkin."
-        )
-
-        # ADMINGA
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=f"📦 BUYURTMA TASDIQLANDI\nID: {order_id}"
-        )
-
-        await query.answer("Tasdiqlandi")
-
+ 
     elif data.startswith("deliver_"):
         order_id = data.split("_")[1]
-        order = orders.get(order_id)
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
 
-        if not order:
+        if not row:
             return
 
-        user_id = order["user_id"]
+        user_id = row[0]
 
         # USERGA
         await context.bot.send_message(
@@ -1262,12 +1250,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("done_"):
         order_id = data.split("_")[1]
-        order = orders.get(order_id)
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
 
-        if not order:
+        if not row:
             return
 
-        user_id = order["user_id"]
+        user_id = row[0]
 
         await context.bot.send_message(
             chat_id=user_id,
@@ -1279,19 +1268,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"✅ YAKUNLANDI\nID: {order_id}"
         )
 
-        orders.pop(order_id)
-        save_orders()
+        cur.execute("DELETE FROM orders WHERE id=%s", (order_id,))
+        conn.commit()
+       # save_orders()
 
         await query.answer("Yakunlandi")
 
     elif data.startswith("ready_"):
         order_id = data.split("_")[1]
-        order = orders.get(order_id)
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
 
-        if not order:
+        if not row:
             return
 
-        user_id = order["user_id"]
+        user_id = row[0]
 
         await context.bot.send_message(
             chat_id=user_id,
@@ -1307,13 +1298,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("cancel_"):
         order_id = data.split("_")[1]
-        order = orders.get(order_id)
+        cur.execute("SELECT user_id, cart FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
 
-        if not order:
+        if not row:
             return
 
+        user_id = row[0]
+        cart = json.loads(row[1])
+
         # 🔥 mahsulotni qaytaramiz
-        for product_id, item in order["cart"].items():
+        for product_id, item in cart.items():
             qty = item["qty"]
 
             p = next((x for x in products if x["id"] == int(product_id)), None)
@@ -1323,8 +1318,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 p["reserved"] = max(0, p["reserved"] - qty)
 
         load_products_from_db()  # 🔥 ENG MUHIM
-
-        user_id = order["user_id"]
 
         carts[user_id] = {}
 
@@ -1338,24 +1331,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"❌ BUYURTMA BEKOR QILINDI\nID: {order_id}"
         )
 
-        orders.pop(order_id)
+        cur.execute("DELETE FROM orders WHERE id=%s", (order_id,))
+        conn.commit()
 
         await query.answer("Bekor qilindi")
     elif data.startswith("user_cancel_"):
-        order_id = data.split("_")[2]
-        order = orders.get(order_id)
+        order_id = data.split("_")[1]
 
-        if not order:
+        cur.execute("SELECT user_id, cart FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
+
+        if not row:
             await query.answer("Allaqachon bekor qilingan")
             return
 
-        # mahsulotni qaytaramiz
-        for idx, item in order["cart"].items():
-            qty = item["qty"]
-            products[int(idx)]["count"] += qty
-            products[int(idx)]["reserved"] -= qty
+        user_id = row[0]
+        cart = json.loads(row[1])
 
-#        save_products()
+        # 🔥 mahsulotni qaytaramiz
+        for idx, item in cart.items():
+            qty = item["qty"]
+            p = next((x for x in products if x["id"] == int(idx)), None)
+            if p:
+                p["count"] += qty
+                p["reserved"] -= qty
 
         await context.bot.send_message(
             chat_id=ADMIN_ID,
@@ -1363,18 +1362,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await context.bot.send_message(
-            chat_id=order["user_id"],
+            chat_id=user_id,
             text="❌ Buyurtma bekor qilindi"
         )
 
-        orders.pop(order_id)
-        save_orders()
+        cur.execute("DELETE FROM orders WHERE id=%s", (order_id,))
+        conn.commit()
 
-        await query.answer("Bekor qilindi")        
+        await query.answer("Bekor qilindi")
 
     elif data.startswith("delivered_"):
-        order_id = data.split("_")[1]
-        order = orders.get(order_id)
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
+
+        if not row:
+            return
+
+        user_id = row[0]
 
         if not order:
             return
@@ -1395,13 +1399,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # STATUS
         order["status"] = "📦 Yetkazildi"
-        save_orders()
+       # save_orders()
 
         await query.answer("Yetkazildi")
 
     elif data.startswith("paid_"):
-        order_id = data.split("_")[1]
-        order = orders.get(order_id)
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
+
+        if not row:
+            return
+
+        user_id = row[0]
 
         if not order:
             return
@@ -1420,15 +1429,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"💰 To‘lov olindi\nID: {order_id}"
         )
 
-        # ORDERNI YOPAMIZ
-        orders.pop(order_id)
-        save_orders()
+        cur.execute("DELETE FROM orders WHERE id=%s", (order_id,))
+        conn.commit()
 
         await query.answer("To‘lov olindi")
 
     elif data.startswith("accept_"):
-        order_id = data.split("_")[1]
-        order = orders.get(str(order_id))
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
+
+        if not row:
+            return
+
+        user_id = row[0]
 
         if not order:
             return
@@ -1464,8 +1477,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Yuborildi")
 
     elif data.startswith("contact_"):
-        order_id = data.split("_")[1]
-        order = orders.get(str(order_id))
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
+
+        if not row:
+            return
+
+        user_id = row[0]
 
         if not order:
             return
@@ -1485,8 +1503,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.answer("Mijozga yuborildi")
     elif data.startswith("picked_"):
-        order_id = data.split("_")[1]
-        order = orders.get(str(order_id))
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
+
+        if not row:
+            return
+
+        user_id = row[0]
 
         if not order:
             return
@@ -1504,7 +1527,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         orders.pop(str(order_id))
-        save_orders()
+       # save_orders()
 
 # ===== SAVAT SYSTEMA (YANGI) =====
 
@@ -1524,10 +1547,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if int(idx) in cart:
                     qty = item["qty"]
 
-                    if products[int(idx)].get("reserved", 0) >= qty:
-                        products[int(idx)]["reserved"] -= qty
+                    p = next((x for x in products if x["id"] == int(idx)), None)
+                    if p:
+                        p["reserved"] = max(0, p.get("reserved", 0) - qty)
                     else:
-                        products[int(idx)]["reserved"] = 0
+                        p = next((x for x in products if x["id"] == int(idx)), None)
+                        if p:
+                            p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
         carts[user_id] = new_cart
         cart = new_cart
@@ -1658,19 +1684,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     elif data.startswith("confirm_"):
         order_id = data.split("_")[1]
-        order = orders.get(order_id)
 
-        if not order:
+        cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
+        row = cur.fetchone()
+
+        if not row:
             return
 
-        user_id = order["user_id"]
+        user_id = row[0]
 
-        # USERGA
         await context.bot.send_message(
             chat_id=user_id,
-            text="📦 Buyurtmangiz tayyor!\n🕒 Kelishilgan vaqtda olib ketishingiz mumkin."
+            text="📦 Buyurtmangiz tayyor! Kelishilgan vaqtda olib ketishingiz mumkin"
         )
 
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=f"📦 BUYURTMA TASDIQLANDI\nID: {order_id}"
+        )
+
+        await query.answer("Tasdiqlandi")
 async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if context.user_data.get("order_step") != "location":
@@ -1691,9 +1724,9 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for idx, item in cart.items():
         qty = item["qty"]
-            p = next((x for x in products if x["id"] == idx), None)
-            if not p:
-                continue
+        p = next((x for x in products if x["id"] == idx), None)
+        if not p:
+            continue
 
         price = int(
             p["price"].lower()
@@ -1749,14 +1782,10 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         user_id = update.effective_user.id
-        order_id = str(len(orders) + 1)
-
-        # ===== ORDER SAQLASH =====
-        import json, time
-
         cur.execute("""
         INSERT INTO orders (user_id, cart, location, phone, total, status, time)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
+        RETURNING id
         """, (
             user_id,
             json.dumps(data["cart"]),
@@ -1767,12 +1796,15 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             time.time()
         ))
 
+        order_id = str(cur.fetchone()[0])
         conn.commit()
         # ===== MAHSULOTNI KAMAYTIRISH =====
         for idx, item in data["cart"].items():
             qty = item["qty"]
-            products[int(idx)]["count"] -= qty
-            products[int(idx)]["reserved"] -= qty
+            p = next((x for x in products if x["id"] == int(idx)), None)
+            if p:
+                p["count"] -= qty
+                p["reserved"] -= qty
 
         #save_products()
 # ===== USERGA MAHSULOT =====
@@ -1894,6 +1926,6 @@ app.add_handler(MessageHandler(filters.LOCATION, location_handler))
 app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle))
 
 app.add_handler(CallbackQueryHandler(button_handler))
-
 load_products_from_db()
+#load_orders()
 app.run_polling()
