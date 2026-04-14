@@ -169,7 +169,14 @@ async def show_cart(update, context):
             f"{item['name']} x {item['quantity']}",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+def load_products_from_db():
+    global products
 
+    if os.path.exists(PRODUCTS_FILE):
+        with open(PRODUCTS_FILE, "r") as f:
+            products = json.load(f)
+    else:
+        products = []
 # ================== CALLBACK ==================
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
