@@ -664,6 +664,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ))
 
         conn.commit()
+        load_products_from_db()
 
         context.user_data.clear()
 
