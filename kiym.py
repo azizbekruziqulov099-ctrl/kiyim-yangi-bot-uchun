@@ -205,9 +205,6 @@ CATEGORIES = [
     "🩲 Ichki kiyim"
 ]
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    load_products_from_db()   # 🔥 SHART
-
 # START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     load_products_from_db()
@@ -1093,6 +1090,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("BUTTON ISHLADI")
     query = update.callback_query
     await query.answer()
 
@@ -1901,7 +1899,7 @@ app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
 app.add_handler(MessageHandler(filters.LOCATION, location_handler))
 app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle))
 
-app.add_handler(CallbackQueryHandler(button_handler))
+app.add_handler(CallbackQueryHandler(button_handler, pattern=".*"))
 load_products_from_db()
 #load_orders()
 app.run_polling()
