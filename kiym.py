@@ -1100,49 +1100,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data.startswith("add_"):
-        load_products_from_db()
-
         product_id = int(data.split("_")[1])
         user_id = query.from_user.id
 
+        # 🔥 mahsulotni topamiz
         product = next((x for x in products if x["id"] == product_id), None)
+
         if not product:
-            await query.answer("❌ Topilmadi", show_alert=True)
+            await query.message.reply_text("❌ Topilmadi")
             return
 
-        if product["count"] - (product.get("reserved") or 0) <= 0:
-            await query.answer("❌ Qolmagan", show_alert=True)
-            return
-
-        # 🔥 SAVATNI 100% TO‘G‘RI QILAMIZ
+        # 🔥 savatni yaratamiz
         if user_id not in carts:
             carts[user_id] = {}
 
-        pid = str(product_id)   # 🔥 DOIM STRING
-
-        # 🔥 ESKI INT KEYLARNI TOZALAYDI
-        carts[user_id] = {str(k): v for k, v in carts[user_id].items()}
-
-        if pid in carts[user_id]:
-            carts[user_id][pid]["qty"] += 1
+        # 🔥 toza ishlaydigan variant (INT bilan)
+        if product_id in carts[user_id]:
+            carts[user_id][product_id]["qty"] += 1
         else:
-            carts[user_id][pid] = {
+            carts[user_id][product_id] = {
                 "qty": 1,
                 "time": time.time()
             }
 
-        carts[user_id][pid]["time"] = time.time()
-
-        # 🔥 RESERVED UPDATE
-        product["reserved"] = (product.get("reserved") or 0) + 1
-        cur.execute(
-            "UPDATE products SET reserved = %s WHERE id = %s",
-            (product["reserved"], product_id)
-        )
-        conn.commit()
-
-        await query.answer("✅ Qo‘shildi")
-        await query.message.reply_text("✅ Savatga qo‘shildi")
+        await query.message.reply_text("✅ SAVATGA QO‘SHILDI")
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
