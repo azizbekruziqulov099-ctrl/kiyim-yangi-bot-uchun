@@ -199,8 +199,9 @@ def load_products():
 
 ADMIN_MENU = ReplyKeyboardMarkup(
     [
-        ["🗑 Tozalash", "🏠 Bosh menyu"],
-        ["🛍 Kiyimlar", "🧺 Savat"],
+        ["📊 Statistika", "📦 Buyurtmalar"],
+        ["➕ Mahsulot qo‘shish", "📢 Reklama"],
+        ["🏠 Bosh menyu"]
     ],
     resize_keyboard=True
 )
@@ -231,19 +232,28 @@ CATEGORIES = [
 
 # START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = update.effective_user.id
+
+    # 🔥 USERNI SAQLAYMIZ
+    cur.execute(
+        "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
+        (user_id,)
+    )
+    conn.commit()
+
     load_products_from_db()
-    if update.effective_user.id == ADMIN_ID:
+
+    if user_id == ADMIN_ID:
         await update.message.reply_text(
             "👑 Admin panel",
             reply_markup=ADMIN_MENU
         )
     else:
         await update.message.reply_text(
-            "Assalomu alaykum 👋",
+            "Assalomu Azizjon 👋",
             reply_markup=MAIN_MENU
         )
-
-
 # RASM QABUL (ADMIN)
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -281,7 +291,86 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
-        
+
+    elif context.user_data.get("step") == "broadcast":
+        msg = text
+
+        cur.execute("SELECT user_id FROM users")
+        users = cur.fetchall()
+
+        count = 0
+
+        for u in users:
+            try:
+                await context.bot.send_message(chat_id=u[0], text=msg)
+                count += 1
+            except:
+                pass
+
+        await update.message.reply_text(f"✅ {count} ta userga yuborildi")
+
+        context.user_data.clear()
+
+    elif text == "📢 Reklama":
+        if update.effective_user.id != ADMIN_ID:
+            return
+
+        context.user_data["step"] = "broadcast"
+        await update.message.reply_text("📢 Yuboriladigan matnni yozing:")
+
+    elif text == "📦 Buyurtmalar":
+        if update.effective_user.id != ADMIN_ID:
+            return
+
+        cur.execute("SELECT id, total, status FROM orders ORDER BY id DESC LIMIT 10")
+        rows = cur.fetchall()
+
+        if not rows:
+            await update.message.reply_text("❌ Buyurtmalar yo‘q")
+            return
+
+        msg = "📦 So‘nggi buyurtmalar:\n\n"
+
+        for r in rows:
+            msg += f"🆔 {r[0]} | 💰 {r[1]} | 📌 {r[2]}\n"
+
+        await update.message.reply_text(msg)
+
+    elif text == "📊 Statistika":
+        if update.effective_user.id != ADMIN_ID:
+            return
+
+        # 🔥 jami buyurtma
+        cur.execute("SELECT COUNT(*) FROM orders")
+        total_orders = cur.fetchone()[0]
+
+        # 🔥 jami pul
+        cur.execute("SELECT SUM(total) FROM orders")
+        total_money = cur.fetchone()[0] or 0
+
+        # 🔥 bugungi buyurtma
+        cur.execute("""
+        SELECT COUNT(*) FROM orders 
+        WHERE DATE(to_timestamp(time)) = CURRENT_DATE
+        """)
+        today_orders = cur.fetchone()[0]
+
+        # 🔥 bugungi pul
+        cur.execute("""
+        SELECT SUM(total) FROM orders 
+        WHERE DATE(to_timestamp(time)) = CURRENT_DATE
+        """)
+        today_money = cur.fetchone()[0] or 0
+
+        await update.message.reply_text(
+            f"📊 STATISTIKA\n\n"
+            f"🧾 Jami buyurtma: {total_orders}\n"
+            f"💰 Jami tushum: {total_money}\n\n"
+            f"📅 Bugun:\n"
+            f"📦 Buyurtma: {today_orders}\n"
+            f"💵 Tushum: {today_money}"
+        )
+
     elif context.user_data.get("step") == "origin":
         origin = text.replace("🇺🇿 ", "").replace("🇨🇳 ", "").replace("🇹🇷 ", "").replace("🏭 ", "")
         context.user_data["origin"] = origin
@@ -575,19 +664,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("🏠 Bosh menyu", reply_markup=MAIN_MENU)
 
         return
-    elif text == "📊 Statistika":
-        if update.effective_user.id != ADMIN_ID:
-            return
-
-        cur.execute("SELECT COUNT(*) FROM orders")
-        count = cur.fetchone()[0]
-        cur.execute("SELECT SUM(total) FROM orders")
-        total = cur.fetchone()[0] or 0
-
-        await update.message.reply_text(
-            f"📊 Buyurtmalar: {count}\n💰 Jami: {total}"
-        )
-
+    
     elif context.user_data.get("step") == "season":
         season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
     
