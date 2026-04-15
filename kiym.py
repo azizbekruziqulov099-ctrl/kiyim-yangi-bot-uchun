@@ -655,7 +655,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if not price.isdigit():
             await update.message.reply_text("❌ Faqat raqam yozing (masalan: 50000)")
-            return
+                return
 
             price = int(''.join(filter(str.isdigit, p["price"])))
         price = f"{price:,}".replace(",", " ")
@@ -794,7 +794,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             price = int(''.join(filter(str.isdigit, p["price"])))
 
-            summa = price * qty
+            summa = pprice * qty
             total += summa
 
             msg += f"{p['name']} x{qty} = {summa}\n"
@@ -1144,29 +1144,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("plus_"):
         product_id = int(data.split("_")[1])
 
-        product = next((x for x in products if x["id"] == int(product_id)), None)
-
+        product = next((x for x in products if x["id"] == product_id), None)
         if not product:
             return
 
-        # 🔥 TEKSHIRUV
         if product["count"] - product.get("reserved", 0) <= 0:
             await query.answer("❌ Yetarli mahsulot yo‘q", show_alert=True)
             return
 
-        product_id = int(data.split("_")[1])
+        if user_id not in carts:
+            carts[user_id] = {}
 
-        if product_id not in carts.get(user_id, {}):
-            return
+        # 🔥 ENG MUHIM TUZATISH
+        if product_id in carts[user_id]:
+            carts[user_id][product_id]["qty"] += 1
+        else:
+            carts[user_id][product_id] = {
+                "qty": 1,
+                "time": time.time()
+            }
 
-        
         carts[user_id][product_id]["time"] = time.time()
-
         product["reserved"] += 1
-        #save_products()
 
         await query.answer("➕ Qo‘shildi")
-
     elif data.startswith("send_"):
         order_id = data.split("_")[1]
         cur.execute("SELECT user_id FROM orders WHERE id=%s", (order_id,))
@@ -1529,7 +1530,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             price = int(''.join(filter(str.isdigit, p["price"])))
 
-            summa = price * qty
+            summa = pprice * qty
             total += summa
 
             msg += f"{p['name']} x{qty} = {summa}\n"
@@ -1542,7 +1543,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             price = int(''.join(filter(str.isdigit, p["price"])))
 
-            summa = price * qty
+            summa = pprice * qty
             total += summa
 
             msg += f"{p['name']} x{qty} = {summa}\n"
@@ -1593,9 +1594,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            pprice = int(''.join(filter(str.isdigit, p["price"])))
+            price = int(''.join(filter(str.isdigit, text)))
 
-            summa = price * qty
+            summa = pprice * qty
             total += summa
 
             msg += f"{p['name']} x{qty} = {summa}\n"
@@ -1678,7 +1679,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not p:
             continue
 
-        pprice = int(''.join(filter(str.isdigit, p["price"])))
+        price = int(''.join(filter(str.isdigit, text)))
 
         total += price * qty
 
