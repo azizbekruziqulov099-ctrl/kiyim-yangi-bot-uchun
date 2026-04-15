@@ -657,7 +657,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Faqat raqam yozing (masalan: 50000)")
             return
 
-        price = int(''.join(filter(str.isdigit, text)))
+        pprice = int(''.join(filter(str.isdigit, p["price"])))
         price = f"{price:,}".replace(",", " ")
 
         context.user_data["price"] = price + " so‘m"
@@ -1487,26 +1487,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         now = time.time()
         new_cart = {}
 
+        # ⏳ 2 soatdan eski itemlarni tozalash
         for pid, item in cart.items():
             if now - item["time"] < 7200:
                 new_cart[pid] = item
             else:
-                # 🔒 faqat agar savatda hali bo‘lsa kamaytiradi
-                if int(pid) in cart:
-                    qty = item["qty"]
-
-                    p = next((x for x in products if x["id"] == int(pid)), None)
-                    if p:
-                        p["reserved"] = max(0, p.get("reserved", 0) - qty)
-                    else:
-                        p = next((x for x in products if x["id"] == int(pid)), None)
-                        if p:
-                            p["reserved"] = max(0, p.get("reserved", 0) - qty)
+                qty = item["qty"]
+                p = next((x for x in products if x["id"] == int(pid)), None)
+                if p:
+                    p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
         carts[user_id] = new_cart
         cart = new_cart
-       # save_products()
 
+        # 🧺 Savat bo‘sh bo‘lsa
         if not cart:
             await query.message.reply_text("🧺 Savat bo‘sh")
             return
@@ -1515,32 +1509,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = 0
         keyboard = []
 
-        for idx, item in cart.items():
+        # 📦 Savat ichidagi mahsulotlar
+        for pid, item in cart.items():
             try:
-                pid = int(idx)
+                pid = int(pid)
             except:
                 continue
 
-            p = next((x for x in products if x["id"] == int(pid)), None)
-
+            p = next((x for x in products if x["id"] == pid), None)
             if not p:
                 continue
 
             qty = item["qty"]
 
-            pprice = int(''.join(filter(str.isdigit, p["price"])))
-
-            summa = pprice * qty
-            total += summa
-
-            msg += f"{p['name']} x{qty} = {summa}\n"
-
-            keyboard.append([
-                InlineKeyboardButton(f"❌ {p['name']}", callback_data=f"del_{pid}")
-            ])
-            if not p:
-                continue
-
+            # 💰 narxni tozalab olish
             pprice = int(''.join(filter(str.isdigit, p["price"])))
 
             summa = pprice * qty
@@ -1561,8 +1543,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🔙 Orqaga", callback_data="back")
         ])
 
-        await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-
+        await query.message.reply_text(
+            msg,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     elif data.startswith("del_"):
         product_id = int(data.split("_")[1])
 
@@ -1594,7 +1578,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            pprice = int(''.join(filter(str.isdigit, text)))
+            pprice = int(''.join(filter(str.isdigit, p["price"])))
 
             summa = pprice * qty
             total += summa
@@ -1679,7 +1663,7 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not p:
             continue
 
-        price = int(''.join(filter(str.isdigit, text)))
+        pprice = int(''.join(filter(str.isdigit, p["price"])))
 
         total += price * qty
 
