@@ -658,7 +658,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Faqat raqam yozing (masalan: 50000)")
             return
 
-        pprice = int(''.join(filter(str.isdigit, p["price"])))
+        price = int(price)
         price = f"{price:,}".replace(",", " ")
 
         context.user_data["price"] = price + " so‘m"
