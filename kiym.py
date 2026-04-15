@@ -1091,39 +1091,47 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         import time
         product_id = int(data.split("_")[1])
 
-        product = next((x for x in products if x["id"] == product_id), None)
-        if not product:
-            await query.answer("❌ Topilmadi", show_alert=True)
-            return
+        if product_id not in product_locks:
+            product_locks[product_id] = asyncio.Lock()
 
-        if product["count"] - product.get("reserved", 0) <= 0:
-            await query.answer("❌ Qolmagan", show_alert=True)
-            return
+        async with product_locks[product_id]:
 
-        if user_id not in carts:
-            carts[user_id] = {}
+            product = next((x for x in products if x["id"] == product_id), None)
+            if not product:
+                await query.answer("❌ Topilmadi", show_alert=True)
+                return
 
-        if product_id in carts[user_id]:
-            carts[user_id][product_id]["qty"] += 1
-        else:
-            carts[user_id][product_id] = {
-                "qty": 1,
-                "time": time.time()
-            }
+            # 🔥 REAL TEKSHIRUV
+            available = product["count"] - product.get("reserved", 0)
 
-        carts[user_id][product_id]["time"] = time.time()
-        product["reserved"] = product.get("reserved", 0) + 1
+            if available <= 0:
+                await query.answer("❌ Bu mahsulot band yoki qolmagan", show_alert=True)
+                return
 
-        # ✅ POPUP
-        await query.answer("✅ Tanlangan maxshulot savatga qo‘shildi, 2 soat ichida xarid qilmasangiz o'chiriladi. ")
+            if user_id not in carts:
+                carts[user_id] = {}
 
-        # 🔥 CHATGA XABAR + BUTTON
+            if product_id in carts[user_id]:
+                carts[user_id][product_id]["qty"] += 1
+            else:
+                carts[user_id][product_id] = {
+                    "qty": 1,
+                    "time": time.time()
+                }
+
+            carts[user_id][product_id]["time"] = time.time()
+
+            # 🔥 ENG MUHIM — RESERVE
+            product["reserved"] = product.get("reserved", 0) + 1
+
+        await query.answer("✅ Savatga qo‘shildi")
+
         keyboard = [
             [InlineKeyboardButton("🧺 Savatga o‘tish", callback_data="go_cart")]
         ]
 
         await query.message.reply_text(
-            "🛒 Mahsulot savatga qo‘shildi!\n\n⏳ 2 soat ichida xarid qilmasangiz savatdan o‘chadi.",
+            "🛒 Mahsulot vaqtincha siz uchun band qilindi!\n⏳ 2 soat ichida xarid qilmasangiz o‘chiriladi.",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     elif data.startswith("delete_"):
