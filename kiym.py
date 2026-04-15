@@ -1,3 +1,16 @@
+import json
+import time
+from telegram import KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
+import asyncio
+import os
+import psycopg2
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+conn = psycopg2.connect(DATABASE_URL)
 
 cur = conn.cursor()
 cur.execute("""
