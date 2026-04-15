@@ -74,6 +74,7 @@ def get_category_buttons(context):
 
         ["🔙 Orqaga", "🏠 Bosh menyu"]
     ]
+
 def filter_check(p, context):
     # gender
     if context.user_data.get("filter_gender"):
@@ -110,7 +111,29 @@ def filter_check(p, context):
             return False
 
     return True
-    
+
+def clean_cart(user_id, context=None):
+    import time
+    now = time.time()
+
+    # 🔥 BUYURTMA BOSILGAN BO‘LSA — TO‘XTAT
+    if context and context.user_data.get("order_started"):
+        return carts.get(user_id, {})
+
+    cart = carts.get(user_id, {})
+    new_cart = {}
+
+    for pid, item in cart.items():
+        if now - item["time"] < 7200:
+            new_cart[int(pid)] = item
+        else:
+            p = next((x for x in products if x["id"] == int(pid)), None)
+            if p:
+                p["reserved"] = max(0, p.get("reserved", 0) - item["qty"])
+
+    carts[user_id] = new_cart
+    return new_cart
+
 def load_products_from_db():
     global products
 
@@ -736,7 +759,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "🧺 Savat":
         load_products_from_db()
         user_id = update.effective_user.id
-        cart = carts.get(user_id, {})
+        cart = clean_cart(user_id, context)
 
         import time
         now = time.time()
@@ -931,7 +954,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             p = next((x for x in products if x["id"] == int(pid)), None)
             if p:
                 p["count"] -= qty
-                p["reserved"] -= qty
+                p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
         #save_products()
 
@@ -1064,21 +1087,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data.startswith("add_"):
+        import time
         product_id = int(data.split("_")[1])
-        user_id = query.from_user.id
 
-        # 🔥 mahsulotni topamiz
         product = next((x for x in products if x["id"] == product_id), None)
-
         if not product:
-            await query.message.reply_text("❌ Topilmadi")
+            await query.answer("❌ Topilmadi", show_alert=True)
             return
 
-        # 🔥 savatni yaratamiz
+        if product["count"] - product.get("reserved", 0) <= 0:
+            await query.answer("❌ Qolmagan", show_alert=True)
+            return
+
         if user_id not in carts:
             carts[user_id] = {}
 
-        # 🔥 toza ishlaydigan variant (INT bilan)
         if product_id in carts[user_id]:
             carts[user_id][product_id]["qty"] += 1
         else:
@@ -1087,7 +1110,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "time": time.time()
             }
 
-        await query.message.reply_text("✅ SAVATGA QO‘SHILDI")
+        carts[user_id][product_id]["time"] = time.time()
+
+        product["reserved"] = product.get("reserved", 0) + 1
+
+        await query.answer("✅ Qo‘shildi")
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
@@ -1295,7 +1322,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             p = next((x for x in products if x["id"] == int(pid)), None)
             if p:
                 p["count"] += qty
-                p["reserved"] -= qty
+                p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
         await context.bot.send_message(
             chat_id=ADMIN_ID,
@@ -1538,13 +1565,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("del_"):
         product_id = int(data.split("_")[1])
 
-        user_id = query.from_user.id
         cart = carts.get(user_id, {})
 
         if product_id in cart:
             qty = cart[product_id]["qty"]
 
-            p = next((x for x in products if x["id"] == int(product_id)), None)
+            p = next((x for x in products if x["id"] == product_id), None)
             if p:
                 p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
@@ -1585,6 +1611,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
     elif data == "checkout":
+        import time
+        context.user_data["order_started"] = time.time()
         context.user_data["order_step"] = "choose_type"
 
         keyboard = [
@@ -1720,7 +1748,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             p = next((x for x in products if x["id"] == int(pid)), None)
             if p:
                 p["count"] -= qty
-                p["reserved"] -= qty
+                p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
         #save_products()
 # ===== USERGA MAHSULOT =====
