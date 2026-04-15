@@ -1,16 +1,4 @@
-import json
-import time
-from telegram import KeyboardButton
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackQueryHandler
-import asyncio
-import os
-import psycopg2
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()
 cur.execute("""
 CREATE TABLE IF NOT EXISTS products (
@@ -1111,10 +1099,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }
 
         carts[user_id][product_id]["time"] = time.time()
-
         product["reserved"] = product.get("reserved", 0) + 1
 
-        await query.answer("✅ Qo‘shildi")
+        # ✅ POPUP
+        await query.answer("✅ Tanlangan maxshulot savatga qo‘shildi, 2 soat ichida xarid qilmasangiz o'chiriladi. ")
+
+        # 🔥 CHATGA XABAR + BUTTON
+        keyboard = [
+            [InlineKeyboardButton("🧺 Savatga o‘tish", callback_data="go_cart")]
+        ]
+
+        await query.message.reply_text(
+            "🛒 Mahsulot savatga qo‘shildi!\n\n⏳ 2 soat ichida xarid qilmasangiz savatdan o‘chadi.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
