@@ -655,9 +655,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if not price.isdigit():
             await update.message.reply_text("❌ Faqat raqam yozing (masalan: 50000)")
-                return
+            return
 
-            price = int(''.join(filter(str.isdigit, p["price"])))
+        price = int(''.join(filter(str.isdigit, text)))
         price = f"{price:,}".replace(",", " ")
 
         context.user_data["price"] = price + " so‘m"
@@ -792,7 +792,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            price = int(''.join(filter(str.isdigit, p["price"])))
+            pprice = int(''.join(filter(str.isdigit, p["price"])))
 
             summa = pprice * qty
             total += summa
@@ -1528,7 +1528,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             qty = item["qty"]
 
-            price = int(''.join(filter(str.isdigit, p["price"])))
+            pprice = int(''.join(filter(str.isdigit, p["price"])))
 
             summa = pprice * qty
             total += summa
@@ -1541,7 +1541,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            price = int(''.join(filter(str.isdigit, p["price"])))
+            pprice = int(''.join(filter(str.isdigit, p["price"])))
 
             summa = pprice * qty
             total += summa
@@ -1594,7 +1594,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            price = int(''.join(filter(str.isdigit, text)))
+            pprice = int(''.join(filter(str.isdigit, text)))
 
             summa = pprice * qty
             total += summa
