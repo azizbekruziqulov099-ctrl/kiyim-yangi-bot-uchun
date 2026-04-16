@@ -277,8 +277,9 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 # HANDLE
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        # ===== ADMIN FLOW =====
     try:    
+        text = update.message.text
+        # ===== ADMIN FLOW =====
         if context.user_data.get("step") == "gender":
             gender = text.replace("👦 ", "").replace("👧 ", "")
             context.user_data["gender"] = gender
