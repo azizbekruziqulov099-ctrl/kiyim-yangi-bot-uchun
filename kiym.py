@@ -233,9 +233,10 @@ CATEGORIES = [
 # START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    context.user_data.clear()  # 🔥 ENG MUHIM
+
     user_id = update.effective_user.id
 
-    # 🔥 USERNI SAQLAYMIZ
     cur.execute(
         "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
         (user_id,)
@@ -251,7 +252,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text(
-            "Assalomu Azizjon 👋",
+            "Assalomu alaykum AZIZJON AXMADOVICH  👋",
             reply_markup=MAIN_MENU
         )
 # RASM QABUL (ADMIN)
@@ -741,7 +742,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         context.user_data["price"] = price + " so‘m"
 
-        # 🔥 DB GA SAQLAYDI
+        # DB
         cur.execute("""
         INSERT INTO products (photo, gender, origin, season, category, name, size, price, count, reserved)
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
