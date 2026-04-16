@@ -233,12 +233,7 @@ CATEGORIES = [
 # START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    context.user_data.clear()  # 🔥 reset
-
-    await update.message.reply_text(
-        "🏠 Bosh menyu",
-        reply_markup=MAIN_MENU
-    )
+    context.user_data.clear()
 
     user_id = update.effective_user.id
 
@@ -250,6 +245,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     load_products_from_db()
 
+    # 🔥 BIR MARTA JAVOB BERAMIZ
     if user_id == ADMIN_ID:
         await update.message.reply_text(
             "👑 Admin panel",
@@ -257,7 +253,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text(
-            "Assalomu alaykum AZIZJON AXMADOVICH  👋",
+            "Assalomu alaykum AZIZJON AHMADOVICH 👋",
             reply_markup=MAIN_MENU
         )
 # RASM QABUL (ADMIN)
