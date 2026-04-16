@@ -273,7 +273,10 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 # HANDLE
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:    
+    try:
+        if not update.message:
+            return
+
         text = update.message.text
         # ===== ADMIN FLOW =====
         if context.user_data.get("step") == "gender":
