@@ -44,6 +44,12 @@ CREATE TABLE IF NOT EXISTS orders (
 
 conn.commit()
 
+cur.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    user_id BIGINT PRIMARY KEY
+)
+""")
+conn.commit()
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
