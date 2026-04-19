@@ -306,6 +306,51 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         elif text == "🔍 Qidirish":
             context.user_data.clear()
+            context.user_data["step"] = "search_gender"
+
+            keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
+
+            await update.message.reply_text(
+                "Kim uchun:",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+
+        elif context.user_data.get("step") == "search_gender":
+            gender = text.replace("👦 ", "").replace("👧 ", "")
+            context.user_data["filter_gender"] = gender
+
+            context.user_data["step"] = "search_origin"
+
+            keyboard = [
+                ["🇺🇿 Vodiy", "🇨🇳 Xitoy"],
+                ["🇹🇷 Turkiya", "🏭 8-mart fabrika"]
+            ]
+
+            await update.message.reply_text(
+                "Qaysi ishlab chiqarish:",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+
+        elif context.user_data.get("step") == "search_origin":
+            origin = text.replace("🇺🇿 ", "").replace("🇨🇳 ", "").replace("🇹🇷 ", "").replace("🏭 ", "")
+            context.user_data["filter_origin"] = origin
+
+            context.user_data["step"] = "search_season"
+
+            keyboard = [
+                ["☀️ Yozgi","❄️ Qishki"],
+                ["🌸 Bahor","🍂 Kuz"]
+            ]
+
+            await update.message.reply_text(
+                "Fasl tanlang:",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+
+        elif context.user_data.get("step") == "search_season":
+            season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
+            context.user_data["filter_season"] = season
+
             context.user_data["step"] = "search_category"
 
             keyboard = get_category_buttons(context)
@@ -337,7 +382,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             found = False
 
             for p in products:
-                if p["category"].lower() != context.user_data.get("filter_category"):
+                if not filter_check(p, context):
                     continue
 
                 # 🔥 SIZE MATCH
