@@ -1,4 +1,4 @@
-import json
+=import json
 import time
 from telegram import KeyboardButton
 from telegram import Update, ReplyKeyboardMarkup
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS products (
     size TEXT,
     price TEXT,
     count INTEGER,
-    reserved INTEGER
+    reserved INTEGER DEFAULT 0
 )
 """)
 
@@ -214,7 +214,8 @@ ADMIN_MENU = ReplyKeyboardMarkup(
 
 MAIN_MENU = ReplyKeyboardMarkup(
     [
-        ["🛍 Kiyimlar", "🧺 Savat"],
+        ["🛍 Kiyimlar"],
+        ["🔍 Qidirish", "🧺 Savat"],
         ["ℹ️ Yordam", "📏 Razmer jadvali"]
     ],
     resize_keyboard=True
@@ -254,12 +255,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🔥 BIR MARTA JAVOB BERAMIZ
     if user_id == ADMIN_ID:
         await update.message.reply_text(
-            "👑 Admin panel",
+            "👑 Admin panel, Assalomu aleykum AZIZJON AHMADOVICH " ,
             reply_markup=ADMIN_MENU
         )
     else:
         await update.message.reply_text(
-            "Assalomu alaykum AZIZJON AHMADOVICH 👋",
+            "Assalomu alaykum 👋",
             reply_markup=MAIN_MENU
         )
 # RASM QABUL (ADMIN)
@@ -302,6 +303,80 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
             return
+        
+        elif text == "🔍 Qidirish":
+            context.user_data.clear()
+            context.user_data["step"] = "search_category"
+
+            keyboard = get_category_buttons(context)
+
+            await update.message.reply_text(
+                "Kategoriya tanlang:",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+
+        elif context.user_data.get("step") == "search_category" and "(" in text:
+            category = text.split("(")[0]
+            category = category.replace("👕","").replace("👖","").replace("🧥","") \
+                    .replace("🩳","").replace("👟","").replace("🧢","").replace("🩲","").strip().lower()
+
+            context.user_data["filter_category"] = category
+            context.user_data["step"] = "search_size"
+
+            await update.message.reply_text("🔢 Razmer yozing (masalan 44):")
+
+        elif context.user_data.get("step") == "search_size":
+            size_input = text.strip()
+
+            if not size_input.isdigit():
+                await update.message.reply_text("❌ Faqat raqam yozing (masalan 44)")
+                return
+
+            context.user_data["search_size"] = size_input
+
+            found = False
+
+            for p in products:
+                if p["category"].lower() != context.user_data.get("filter_category"):
+                    continue
+
+                # 🔥 SIZE MATCH
+                try:
+                    user_size = int(size_input)
+
+                    if "-" in p["size"]:
+                        start, end = map(int, p["size"].split("-"))
+                        ok = start <= user_size <= end
+                    else:
+                        ps = int(p["size"])
+                        ok = abs(ps - user_size) <= 1
+
+                except:
+                    ok = False
+
+                if not ok:
+                    continue
+
+                # mavjudlik
+                if (p["count"] - p.get("reserved", 0)) <= 0:
+                    continue
+
+                found = True
+
+                keyboard = [
+                    [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
+                ]
+
+                await update.message.reply_photo(
+                    photo=p["photo"],
+                    caption=f"{p['name']}\nRazmer: {p['size']}\nSoni: {p['count'] - p.get('reserved',0)}\nNarx: {p['price']}",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+
+            if not found:
+                await update.message.reply_text("❌ Mos mahsulot topilmadi")
+
+            context.user_data.clear()
 
         elif context.user_data.get("step") == "broadcast":
             msg = text
@@ -321,6 +396,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✅ {count} ta userga yuborildi")
 
             context.user_data.clear()
+
+        elif context.user_data.get("step") == "edit_name":
+            new_name = text
+            product_id = context.user_data.get("edit_product_id")
+
+            # DB update
+            cur.execute(
+                "UPDATE products SET name=%s WHERE id=%s",
+                (new_name, product_id)
+            )
+            conn.commit()
+
+            load_products_from_db()
+
+            await update.message.reply_text("✅ Nom o‘zgartirildi!")
+
+            context.user_data.clear()
+            return
 
         elif text == "📢 Reklama":
             if update.effective_user.id != ADMIN_ID:
@@ -500,6 +593,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                     if update.effective_user.id == ADMIN_ID:
                         keyboard = [
+                            [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"edit_{p['id']}")],
                             [InlineKeyboardButton("❌ O‘chirish", callback_data=f"delete_{p['id']}")]
                         ]
                     else:
@@ -509,7 +603,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                     await update.message.reply_photo(
                         photo=p["photo"],
-                        caption=f"{p['name']}\n{p['size']}\n{p['price']}",
+                        caption=f"{p['name']}\n📏 Razmer: {p['size']}\n📦 Soni: {p['count'] - p.get('reserved',0)}\n💰 {p['price']}",
                         reply_markup=InlineKeyboardMarkup(keyboard)
                     )
 
@@ -731,28 +825,42 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["name"] = text
             context.user_data["step"] = "size"
 
-            keyboard = [["75-80","80-85","85-90"],["90-95","95-100","100-105","105-110"],["110-115","115-120","120-125","125-130"],["🔙 Orqaga", "🏠 Bosh menyu"]]
-            await update.message.reply_text("O‘lcham:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+            await update.message.reply_text("🔢 Razmer yozing (masalan 44):")
             return
         elif context.user_data.get("step") == "size":
-            context.user_data["size"] = text.replace(" ", "")
+            size = text.strip()
+
+            if not size.isdigit():
+                await update.message.reply_text("❌ Faqat raqam yozing (masalan 44)")
+                return
+
+            context.user_data["size"] = size
             context.user_data["step"] = "price"
 
-            await update.message.reply_text("Narx:")
-            return
+            await update.message.reply_text("Narxni yozing:")
+            
         elif context.user_data.get("step") == "price":
             price = text.replace(" ", "").replace("so'm","").replace("soʻm","")
 
             if not price.isdigit():
-                await update.message.reply_text("❌ Faqat raqam yozing (masalan: 50000)")
+                await update.message.reply_text("❌ Faqat raqam yozing (masalan 50000)")
                 return
 
             price = int(price)
             price = f"{price:,}".replace(",", " ")
 
             context.user_data["price"] = price + " so‘m"
+            context.user_data["step"] = "count"
 
-            # DB
+            await update.message.reply_text("📦 Nechta bor? (masalan 4):")
+        elif context.user_data.get("step") == "count":
+            if not text.isdigit():
+                await update.message.reply_text("❌ Faqat raqam yozing")
+                return
+
+            count = int(text)
+            context.user_data["count"] = count
+
             cur.execute("""
             INSERT INTO products (photo, gender, origin, season, category, name, size, price, count, reserved)
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
@@ -763,19 +871,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ",".join(context.user_data.get("seasons", [])),
                 context.user_data["category"],
                 context.user_data["name"],
-                context.user_data["size"],
+                context.user_data["size"],   # 🔥 44
                 context.user_data["price"],
-                1,
+                context.user_data["count"],  # 🔥 4
                 0
             ))
 
             conn.commit()
             load_products_from_db()
 
+            await update.message.reply_text("✅ Yangi mahsulot qo‘shildi!")
             context.user_data.clear()
-
-            await update.message.reply_text("✅ Qo‘shildi!")
-            return
         elif context.user_data.get("step") == "size_filter" and "-" in text:
             size = text.replace(" ", "")
             context.user_data["filter_size"] = size
@@ -966,6 +1072,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                     if update.effective_user.id == ADMIN_ID:
                         keyboard = [
+                            [InlineKeyboardButton("✏️ Tahrirlash", callback_data=f"edit_{p['id']}")],
                             [InlineKeyboardButton("❌ O‘chirish", callback_data=f"delete_{p['id']}")]
                         ]
                     else:
@@ -975,7 +1082,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                     await update.message.reply_photo(
                         photo=p["photo"],
-                        caption=f"{p['name']}\n{p['size']}\n{p['price']}",
+                        caption=f"{p['name']}\n📏 Razmer: {p['size']}\n📦 Soni: {p['count'] - p.get('reserved',0)}\n💰 {p['price']}",
                         reply_markup=InlineKeyboardMarkup(keyboard)
                     )
 
@@ -1058,7 +1165,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_photo(
                     chat_id=user_id,
                     photo=p["photo"],
-                    caption=f"{p['name']}\n{p['size']}\n{p['price']} x{qty}"
+                    caption=f"{p['name']}\n📏 Razmer: {p['size']}\n💰 {p['price']} x{qty}"
                 )
 
             # ===== USER STATUS =====
@@ -1103,7 +1210,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_photo(
                     chat_id=ADMIN_ID,
                     photo=p["photo"],
-                    caption=f"{p['name']}\n{p['size']}\n{p['price']} x{qty}"
+                    caption=f"{p['name']}\n📏 Razmer: {p['size']}\n💰 {p['price']} x{qty}"
                 )
 
             # ===== ADMINGA UMUMIY INFO =====
@@ -1228,6 +1335,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🛒 Mahsulot vaqtincha siz uchun band qilindi!\n⏳ 2 soat ichida xarid qilmasangiz o‘chiriladi.",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+
+    elif data.startswith("edit_"):
+        product_id = int(data.split("_")[1])
+
+        context.user_data["edit_product_id"] = product_id
+        context.user_data["step"] = "edit_name"
+
+        await query.message.reply_text("✏️ Yangi nomni yozing:")        
+
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
@@ -1854,7 +1970,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_photo(
                 chat_id=user_id,
                 photo=p["photo"],
-                caption=f"{p['name']}\n{p['size']}\n{p['price']} x{qty}"
+                caption=f"{p['name']}\n📏 Razmer: {p['size']}\n💰 {p['price']} x{qty}"
             )
 
         # ===== ADMINGA MAHSULOT =====
@@ -1867,7 +1983,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_photo(
                 chat_id=ADMIN_ID,
                 photo=p["photo"],
-                caption=f"{p['name']}\n{p['size']}\n{p['price']} x{qty}"
+                caption=f"{p['name']}\n📏 Razmer: {p['size']}\n💰 {p['price']} x{qty}"
             )
 
         # ===== ADMIN TUGMALAR =====
