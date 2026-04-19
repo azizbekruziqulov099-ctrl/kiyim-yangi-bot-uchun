@@ -366,80 +366,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
-        elif text == "🔍 Qidirish":
-            context.user_data.clear()
-            context.user_data["step"] = "search_size"
 
-            await update.message.reply_text(
-                "🔢 Razmer yozing (masalan 44):"
-            )
-
-
-        elif context.user_data.get("step") == "search_size":
-            size_input = text.strip()
-
-            if not size_input.isdigit():
-                await update.message.reply_text("❌ Faqat raqam yozing (masalan 44)")
-                return
-
-            context.user_data["filter_size"] = size_input
-            context.user_data["step"] = "search_category"
-
-            keyboard = get_category_buttons(context)
-
-            await update.message.reply_text(
-                "📂 Kategoriya tanlang:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
-
-        elif context.user_data.get("step") == "search_category" and "(" in text:
-
-            category = text.split("(")[0]
-            category = category.replace("👕","").replace("👖","").replace("🧥","") \
-                .replace("🩳","").replace("👟","").replace("🧢","").replace("🩲","").strip().lower()
-
-            context.user_data["filter_category"] = category
-
-            found = False
-
-            for p in products:
-                # 🔥 HAMMA FILTER ISHLAYDI
-                if not filter_check(p, context):
-                    continue
-
-                # 🔥 SIZE LOGIKA
-                try:
-                    user_size = int(context.user_data["filter_size"])
-
-                    if "-" in p["size"]:
-                        start, end = map(int, p["size"].split("-"))
-                        ok = start <= user_size <= end
-                    else:
-                        ps = int(p["size"])
-                        ok = abs(ps - user_size) <= 1
-
-                except:
-                    ok = False
-
-                if not ok:
-                    continue
-
-                found = True
-
-                keyboard = [
-                    [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
-                ]
-
-                await update.message.reply_photo(
-                    photo=p["photo"],
-                    caption=f"{p['name']}\n📏 {p['size']}\n💰 {p['price']}",
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-
-            if not found:
-                await update.message.reply_text("❌ Mos mahsulot topilmadi")
-
-            context.user_data.clear()
 
         elif context.user_data.get("step") == "broadcast":
             msg = text
@@ -459,6 +386,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✅ {count} ta userga yuborildi")
 
             context.user_data.clear()
+
+        elif text == "🔍 Qidirish":
+            context.user_data.clear()
+
+            await update.message.reply_text(
+                "🔎 Tanlang:",
+                reply_markup=get_filter_menu(context.user_data)
+            )
 
         elif context.user_data.get("step") == "edit_name":
             new_name = text
@@ -1337,6 +1272,41 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=MAIN_MENU
             )
             return
+        elif context.user_data.get("step") == "inline_size":
+            size = text.strip()
+
+            if not size.isdigit():
+                await update.message.reply_text("❌ Faqat raqam yoz (masalan 44)")
+                return
+
+            context.user_data["filter_size"] = size
+            context.user_data["step"] = "inline_category"
+
+            keyboard = get_category_buttons(context)
+
+            await update.message.reply_text(
+                "📂 Kategoriya tanlang:",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+
+        elif context.user_data.get("step") == "inline_size":
+            size = text.strip()
+
+            if not size.isdigit():
+                await update.message.reply_text("❌ Faqat raqam yoz (44)")
+                return
+
+            context.user_data["filter_size"] = size
+            context.user_data["step"] = "inline_category"
+
+            keyboard = get_category_buttons(context)
+
+            await update.message.reply_text(
+                "📂 Kategoriya tanlang:",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+
+
     except Exception as e:
         print("XATO:", e)
         await update.message.reply_text("❌ Xatolik yuz berdi. /start bosing")
@@ -1375,28 +1345,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     elif data == "search":
+        context.user_data["step"] = "inline_size"
 
-        found = False
-
-        for p in products:
-            if not filter_check(p, context):
-                continue
-
-            found = True
-
-            keyboard = [
-                [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
-            ]
-
-            await query.message.reply_photo(
-                photo=p["photo"],
-                caption=f"{p['name']}\n📏 {p['size']}\n💰 {p['price']}",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-
-        if not found:
-            await query.message.reply_text("❌ Hech narsa topilmadi")
-
+        await query.message.reply_text(
+            "🔢 Razmer yozing (masalan 44):"
+        )
+        return
+    
     elif data.startswith("add_"):
         import time
         product_id = int(data.split("_")[1])
