@@ -1,4 +1,4 @@
-=import json
+import json
 import time
 from telegram import KeyboardButton
 from telegram import Update, ReplyKeyboardMarkup
