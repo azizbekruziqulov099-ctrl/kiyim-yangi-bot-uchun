@@ -63,6 +63,37 @@ ORIGINS = [
     "🇹🇷 Turkiya",
     "🏭 8-mart fabrika"
 ]
+
+def get_filter_menu(user_data):
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("👦 O‘g‘il", callback_data="g_o'g'il"),
+            InlineKeyboardButton("👧 Qiz", callback_data="g_qiz")
+        ],
+        [
+            InlineKeyboardButton("🇺🇿 Vodiy", callback_data="o_Vodiy"),
+            InlineKeyboardButton("🇨🇳 Xitoy", callback_data="o_Xitoy")
+        ],
+        [
+            InlineKeyboardButton("🇹🇷 Turkiya", callback_data="o_Turkiya"),
+            InlineKeyboardButton("🏭 8-mart", callback_data="o_8-mart fabrika")
+        ],
+        [
+            InlineKeyboardButton("☀️ Yozgi", callback_data="s_Yozgi"),
+            InlineKeyboardButton("❄️ Qishki", callback_data="s_Qishki")
+        ],
+        [
+            InlineKeyboardButton("🌸 Bahor", callback_data="s_Bahor"),
+            InlineKeyboardButton("🍂 Kuz", callback_data="s_Kuz")
+        ],
+        [
+            InlineKeyboardButton("🔍 Qidirish", callback_data="search"),
+            InlineKeyboardButton("🔄 Tozalash", callback_data="reset")
+        ]
+    ])
+
+
+
 def get_category_buttons(context):
     return [
         [f"👕 2 talik ({count_products(context,lambda p: p['category'].lower()=='2 talik kiyim')})",
@@ -306,58 +337,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         elif text == "🔍 Qidirish":
             context.user_data.clear()
-            context.user_data["step"] = "search_gender"
-
-            keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
 
             await update.message.reply_text(
-                "Kim uchun:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
-
-        elif context.user_data.get("step") == "search_gender":
-            gender = text.replace("👦 ", "").replace("👧 ", "")
-            context.user_data["filter_gender"] = gender
-
-            context.user_data["step"] = "search_origin"
-
-            keyboard = [
-                ["🇺🇿 Vodiy", "🇨🇳 Xitoy"],
-                ["🇹🇷 Turkiya", "🏭 8-mart fabrika"]
-            ]
-
-            await update.message.reply_text(
-                "Qaysi ishlab chiqarish:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
-
-        elif context.user_data.get("step") == "search_origin":
-            origin = text.replace("🇺🇿 ", "").replace("🇨🇳 ", "").replace("🇹🇷 ", "").replace("🏭 ", "")
-            context.user_data["filter_origin"] = origin
-
-            context.user_data["step"] = "search_season"
-
-            keyboard = [
-                ["☀️ Yozgi","❄️ Qishki"],
-                ["🌸 Bahor","🍂 Kuz"]
-            ]
-
-            await update.message.reply_text(
-                "Fasl tanlang:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
-
-        elif context.user_data.get("step") == "search_season":
-            season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
-            context.user_data["filter_season"] = season
-
-            context.user_data["step"] = "search_category"
-
-            keyboard = get_category_buttons(context)
-
-            await update.message.reply_text(
-                "Kategoriya tanlang:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                "Filtr tanlang:",
+                reply_markup=get_filter_menu(context.user_data)
             )
 
         elif context.user_data.get("step") == "search_category" and "(" in text:
@@ -382,7 +365,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             found = False
 
             for p in products:
-                if not filter_check(p, context):
+                if p["category"].lower() != context.user_data.get("filter_category"):
                     continue
 
                 # 🔥 SIZE MATCH
@@ -1333,7 +1316,48 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     data = query.data
 
-    if data.startswith("add_"):
+# FILTER TANLASH
+    if data.startswith("g_"):
+        context.user_data["filter_gender"] = data[2:]
+
+    elif data.startswith("o_"):
+        context.user_data["filter_origin"] = data[2:]
+
+    elif data.startswith("s_"):
+        context.user_data["filter_season"] = data[2:]
+
+    elif data == "reset":
+        context.user_data.clear()
+
+        await query.message.edit_reply_markup(
+            reply_markup=get_filter_menu(context.user_data)
+        )
+        return
+
+    elif data == "search":
+
+        found = False
+
+        for p in products:
+            if not filter_check(p, context):
+                continue
+
+            found = True
+
+            keyboard = [
+                [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
+            ]
+
+            await query.message.reply_photo(
+                photo=p["photo"],
+                caption=f"{p['name']}\n📏 {p['size']}\n💰 {p['price']}",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
+        if not found:
+            await query.message.reply_text("❌ Hech narsa topilmadi")
+
+    elif data.startswith("add_"):
         import time
         product_id = int(data.split("_")[1])
 
