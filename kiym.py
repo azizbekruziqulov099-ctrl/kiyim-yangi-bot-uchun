@@ -1359,10 +1359,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("s_"):
         context.user_data["filter_season"] = data[2:]
         # 🔥 MENU YANGILANADI
-            await query.message.edit_reply_markup(
+        await query.message.edit_reply_markup(
             reply_markup=get_filter_menu(context.user_data)
             )
-            return
+        return
 
     elif data == "reset":
         context.user_data.clear()
