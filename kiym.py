@@ -71,8 +71,8 @@ def get_filter_menu(user_data):
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
-                f"👦 O‘g‘il {'✅' if gender=='o‘g\'il' else ''}",
-                callback_data="g_o'g'il"
+                f"👦 O‘g‘il {'✅' if gender=='o‘g‘il' else ''}",
+                callback_data="g_o‘g‘il"
             ),
             InlineKeyboardButton(
                 f"👧 Qiz {'✅' if gender=='qiz' else ''}",
