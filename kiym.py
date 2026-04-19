@@ -64,26 +64,60 @@ ORIGINS = [
     "🏭 8-mart fabrika"
 ]
 def get_filter_menu(user_data):
+    g = user_data.get("filter_gender")
+    o = user_data.get("filter_origin")
+    s = user_data.get("filter_season")
+
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("👦 O‘g‘il", callback_data="g_o‘g‘il"),
-            InlineKeyboardButton("👧 Qiz", callback_data="g_qiz")
+            InlineKeyboardButton(
+                f"👦 O‘g‘il {'✅' if g=='o‘g‘il' else ''}",
+                callback_data="g_o‘g‘il"
+            ),
+            InlineKeyboardButton(
+                f"👧 Qiz {'✅' if g=='qiz' else ''}",
+                callback_data="g_qiz"
+            )
         ],
         [
-            InlineKeyboardButton("🇺🇿 Vodiy", callback_data="o_Vodiy"),
-            InlineKeyboardButton("🇨🇳 Xitoy", callback_data="o_Xitoy")
+            InlineKeyboardButton(
+                f"🇺🇿 Vodiy {'✅' if o=='Vodiy' else ''}",
+                callback_data="o_Vodiy"
+            ),
+            InlineKeyboardButton(
+                f"🇨🇳 Xitoy {'✅' if o=='Xitoy' else ''}",
+                callback_data="o_Xitoy"
+            )
         ],
         [
-            InlineKeyboardButton("🇹🇷 Turkiya", callback_data="o_Turkiya"),
-            InlineKeyboardButton("🏭 8-mart", callback_data="o_8-mart fabrika")
+            InlineKeyboardButton(
+                f"🇹🇷 Turkiya {'✅' if o=='Turkiya' else ''}",
+                callback_data="o_Turkiya"
+            ),
+            InlineKeyboardButton(
+                f"🏭 8-mart {'✅' if o=='8-mart fabrika' else ''}",
+                callback_data="o_8-mart fabrika"
+            )
         ],
         [
-            InlineKeyboardButton("☀️ Yozgi", callback_data="s_Yozgi"),
-            InlineKeyboardButton("❄️ Qishki", callback_data="s_Qishki")
+            InlineKeyboardButton(
+                f"☀️ Yozgi {'✅' if s=='Yozgi' else ''}",
+                callback_data="s_Yozgi"
+            ),
+            InlineKeyboardButton(
+                f"❄️ Qishki {'✅' if s=='Qishki' else ''}",
+                callback_data="s_Qishki"
+            )
         ],
         [
-            InlineKeyboardButton("🌸 Bahor", callback_data="s_Bahor"),
-            InlineKeyboardButton("🍂 Kuz", callback_data="s_Kuz")
+            InlineKeyboardButton(
+                f"🌸 Bahor {'✅' if s=='Bahor' else ''}",
+                callback_data="s_Bahor"
+            ),
+            InlineKeyboardButton(
+                f"🍂 Kuz {'✅' if s=='Kuz' else ''}",
+                callback_data="s_Kuz"
+            )
         ],
         [
             InlineKeyboardButton("✅ Tanlash", callback_data="apply"),
@@ -356,7 +390,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
 
             await update.message.reply_text(
-                "🔎 Tanlang:\n\nJins: -\nFabrika: -\nFasl: -\nRazmer: -",
+                "🔎 Tanlang:\n\nJins: -\nFabrika: -\nFasl: -\nRazmer: -\n\n✍️ Razmerni shu yerga yozing (44)",
+
                 reply_markup=get_filter_menu(context.user_data)
             )
 
@@ -1322,7 +1357,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Jins: {context.user_data.get('filter_gender','-')}\n"
             f"Fabrika: {context.user_data.get('filter_origin','-')}\n"
             f"Fasl: {context.user_data.get('filter_season','-')}\n"
-            f"Razmer: {context.user_data.get('filter_size','-')}",
+            f"Razmer: {context.user_data.get('filter_size','-')}\n\n"
+            f"✍️ Razmerni shu yerga yozing (masalan 44)",
             reply_markup=get_filter_menu(context.user_data)
         )
         return
