@@ -1399,8 +1399,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 conn.commit()
                 load_products_from_db()
 
-                await update.message.reply_text("✅ Saqlandi")
-                context.user_data.clear()
 
         elif context.user_data.get("step") == "edit_gender":
             context.user_data["gender"] = text
