@@ -374,6 +374,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🔢 Razmer yozing (masalan 44):"
             )
 
+
+        elif context.user_data.get("step") == "search_size":
+            size_input = text.strip()
+
+            if not size_input.isdigit():
+                await update.message.reply_text("❌ Faqat raqam yozing (masalan 44)")
+                return
+
+            context.user_data["filter_size"] = size_input
+            context.user_data["step"] = "search_category"
+
+            keyboard = get_category_buttons(context)
+
+            await update.message.reply_text(
+                "📂 Kategoriya tanlang:",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+
         elif context.user_data.get("step") == "search_category" and "(" in text:
 
             category = text.split("(")[0]
@@ -422,22 +440,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ Mos mahsulot topilmadi")
 
             context.user_data.clear()
-        elif context.user_data.get("step") == "search_size":
-            size_input = text.strip()
-
-            if not size_input.isdigit():
-                await update.message.reply_text("❌ Faqat raqam yozing (masalan 44)")
-                return
-
-            context.user_data["filter_size"] = size_input
-            context.user_data["step"] = "search_category"
-
-            keyboard = get_category_buttons(context)
-
-            await update.message.reply_text(
-                "📂 Kategoriya tanlang:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
 
         elif context.user_data.get("step") == "broadcast":
             msg = text
