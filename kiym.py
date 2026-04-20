@@ -149,12 +149,13 @@ def filter_check(p, context):
         if p["gender"] != context.user_data.get("filter_gender"):
             return False
 
-    # size
-    size = int(context.user_data.get("filter_size"))
-    p_size = int(p["size"])
+    # size filter
+    if context.user_data.get("filter_size"):
+        size = int(context.user_data.get("filter_size"))
+        p_size = int(p["size"])
 
-    if abs(p_size - size) > 1:
-        return False
+        if abs(p_size - size) > 1:
+            return False
 
     # season
     if context.user_data.get("filter_season"):
