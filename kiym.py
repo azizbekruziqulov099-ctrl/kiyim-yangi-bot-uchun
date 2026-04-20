@@ -150,9 +150,11 @@ def filter_check(p, context):
             return False
 
     # size
-    if context.user_data.get("filter_size"):
-        if p["size"] != context.user_data.get("filter_size"):
-            return False
+    size = int(context.user_data.get("filter_size"))
+    p_size = int(p["size"])
+
+    if abs(p_size - size) > 1:
+        return False
 
     # season
     if context.user_data.get("filter_season"):
@@ -1557,11 +1559,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✏️ Qaysi qismini o‘zgartirasiz:",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-
-        context.user_data["edit_product_id"] = product_id
-        context.user_data["step"] = "edit_name"
-
-        await query.message.reply_text("✏️ Yangi nomni yozing:")        
+        
 
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
