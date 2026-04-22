@@ -145,50 +145,38 @@ def get_category_buttons(context):
 
 def filter_check(p, context):
 
-    # gender
+    if context.user_data.get("filter_gender"):
+        if p["gender"] != context.user_data["filter_gender"]:
+            return False
+
+    if context.user_data.get("filter_origin"):
+        if p["origin"] != context.user_data["filter_origin"]:
+            return False
+
+    if context.user_data.get("filter_category"):
+        if p["category"] != context.user_data["filter_category"]:
+            return False
+
     if context.user_data.get("filter_size"):
         try:
-            size = int(context.user_data.get("filter_size"))
+            size = int(context.user_data["filter_size"])
             p_size = int(p["size"])
         except:
             return False
 
-        # 🔥 kategoriya mos bo‘lishi shart
-        if context.user_data.get("filter_category"):
-            if p["category"] != context.user_data.get("filter_category"):
-                return False
-
-        # 🔥 ±1 sm diapazon
         if abs(p_size - size) > 1:
             return False
 
-    # season
     if context.user_data.get("filter_season"):
-        seasons = p.get("season", [])
-
-        if isinstance(seasons, str):
-            seasons = [seasons]
-
-        if context.user_data.get("filter_season") not in seasons:
+        if context.user_data["filter_season"] not in p.get("season", []):
             return False
 
-    # category
-    if context.user_data.get("filter_category"):
-        if p["category"].lower() != context.user_data.get("filter_category"):
-            return False
-
-    # mavjudlik
     if (p["count"] - p.get("reserved", 0)) <= 0:
         return False
 
-    # origin
-    if context.user_data.get("filter_origin"):
-        if p.get("origin") != context.user_data.get("filter_origin"):
-            return False
-
     return True
 def clean_cart(user_id, context=None):
-    import time
+    
     now = time.time()
 
     # 🔥 BUYURTMA BOSILGAN BO‘LSA — TO‘XTAT
@@ -241,34 +229,6 @@ def count_products(context, filter_func=None):
                 total += available
 
     return total
-
-def save_products():
-    with open("products.json", "w") as f:
-        json.dump(products, f, indent=4)
-
-
-def load_products():
-    global products
-    try:
-        with open("products.json", "r") as f:
-            products = json.load(f)
-    except:
-        products = []
-
-
-#def save_orders():
- #   with open("orders.json", "w") as f:
-  #      json.dump(orders, f, indent=4)
-
-
-#def load_orders():
- #   global orders
-  #  try:
-   #     with open("orders.json", "r") as f:
-    #        orders = json.load(f)
-    #except:
-        
-
 
 
 ADMIN_MENU = ReplyKeyboardMarkup(
@@ -335,9 +295,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
-
-    print(update.message.photo[-1].file_id)
-
     context.user_data["photo"] = update.message.photo[-1].file_id
     context.user_data["step"] = "gender"
 
@@ -403,23 +360,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             context.user_data["step"] = "inline_all"
-        elif context.user_data.get("step") == "edit_name":
-            new_name = text
-            product_id = context.user_data.get("edit_product_id")
-
-            # DB update
-            cur.execute(
-                "UPDATE products SET name=%s WHERE id=%s",
-                (new_name, product_id)
-            )
-            conn.commit()
-
-            load_products_from_db()
-
-            await update.message.reply_text("✅ Nom o‘zgartirildi!")
-
-            context.user_data.clear()
-            return
 
         elif text == "📢 Reklama":
             if update.effective_user.id != ADMIN_ID:
@@ -807,47 +747,57 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📦 Nechta bor? (masalan 4):")
 
     
-        elif context.user_data.get("step") == "edit_size":
-
-            size = text.strip()
-
-            if not size.isdigit():
-                await update.message.reply_text("❌ Faqat raqam yozing (44)")
-                return
-
-            context.user_data["size"] = size
-            context.user_data["step"] = "edit_menu"
-
-            await update.message.reply_text("✅ Razmer saqlandi, yana nima o‘zgartirasiz?") 
-        
         elif context.user_data.get("step") == "count":
             if not text.isdigit():
                 await update.message.reply_text("❌ Faqat raqam yozing")
                 return
 
-            count = int(text)
-            context.user_data["count"] = count
+            context.user_data["count"] = int(text)
 
-            cur.execute("""
-            INSERT INTO products (photo, gender, origin, season, category, name, size, price, count, reserved)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (
-                context.user_data["photo"],
-                context.user_data["gender"],
-                context.user_data["origin"],
-                ",".join(context.user_data.get("seasons", [])),
-                context.user_data["category"],
-                context.user_data["name"],
-                context.user_data["size"],   # 🔥 44
-                context.user_data["price"],
-                context.user_data["count"],  # 🔥 4
-                0
-            ))
+            if context.user_data.get("mode") == "edit":
+                pid = context.user_data.get("edit_product_id")
+
+                cur.execute("""
+                UPDATE products
+                SET photo=%s, gender=%s, origin=%s, season=%s, category=%s,
+                    name=%s, size=%s, price=%s, count=%s
+                WHERE id=%s
+                """, (
+                    context.user_data["photo"],
+                    context.user_data["gender"],
+                    context.user_data["origin"],
+                    ",".join(context.user_data.get("seasons", [])),
+                    context.user_data["category"],
+                    context.user_data["name"],
+                    context.user_data["size"],
+                    context.user_data["price"],
+                    context.user_data["count"],
+                    pid
+                ))
+
+                await update.message.reply_text("✅ Tahrirlandi!")
+
+            else:
+                cur.execute("""
+                INSERT INTO products (photo, gender, origin, season, category, name, size, price, count, reserved)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """, (
+                    context.user_data["photo"],
+                    context.user_data["gender"],
+                    context.user_data["origin"],
+                    ",".join(context.user_data.get("seasons", [])),
+                    context.user_data["category"],
+                    context.user_data["name"],
+                    context.user_data["size"],
+                    context.user_data["price"],
+                    context.user_data["count"],
+                    0
+                ))
+
+                await update.message.reply_text("✅ Yangi mahsulot qo‘shildi!")
 
             conn.commit()
             load_products_from_db()
-
-            await update.message.reply_text("✅ Yangi mahsulot qo‘shildi!")
             context.user_data.clear()
         elif context.user_data.get("step") == "size_filter" and "-" in text:
             size = text.replace(" ", "")
@@ -872,7 +822,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Tanlang:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
         # 👦 / 👧
-        elif text in ["👦 O‘g‘il", "👧 Qiz"]:
+        elif text in ["👦 O‘g‘il", "👧 Qiz"] and context.user_data.get("step") != "gender":
             gender = text.replace("👦 ", "").replace("👧 ", "")
             context.user_data["filter_gender"] = gender
 
@@ -924,7 +874,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id = update.effective_user.id
             cart = clean_cart(user_id, context)
 
-            import time
+            
             now = time.time()
             new_cart = {}
 
@@ -1328,150 +1278,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=get_filter_menu(context.user_data)
             )
 
-        elif context.user_data.get("step") == "edit_menu":
-
-            if text == "👦 Jins":
-                context.user_data["step"] = "edit_gender"
-
-                keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
-
-                await update.message.reply_text(
-                    "Tanlang:",
-                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-                )
-
-            elif text == "🏭 Fabrika":
-                context.user_data["step"] = "edit_origin"
-
-                keyboard = [
-                    ["🇺🇿 Vodiy", "🇨🇳 Xitoy"],
-                    ["🇹🇷 Turkiya", "🏭 8-mart fabrika"]
-                ]
-
-                await update.message.reply_text(
-                    "Tanlang:",
-                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-                )
-
-            elif text == "🌤 Fasl":
-                context.user_data["step"] = "edit_season"
-                await update.message.reply_text("Yozgi / Qishki / Bahor / Kuz")
-
-            elif text == "📂 Kategoriya":
-                context.user_data["step"] = "edit_category"
-                await update.message.reply_text("Kategoriya yozing")
-
-            elif text == "📏 Uzunlik":
-                context.user_data["step"] = "edit_size"
-                await update.message.reply_text("📏 Yangi uzunlik yozing (sm):")
-
-            elif text == "📦 Soni":
-                context.user_data["step"] = "edit_count"
-                await update.message.reply_text("Soni yozing (5)")
-
-            elif text == "💾 Saqlash":
-                pid = context.user_data.get("edit_product_id")
-
-                # 🔥 eski mahsulotni topamiz
-                p = next((x for x in products if x["id"] == pid), None)
-
-                if not p:
-                    await update.message.reply_text("❌ Mahsulot topilmadi")
-                    context.user_data.clear()
-                    return
-
-                cur.execute("""
-                UPDATE products
-                SET gender=%s, origin=%s, season=%s, category=%s, size=%s, count=%s
-                WHERE id=%s
-                """, (
-                    context.user_data.get("gender", p["gender"]),
-                    context.user_data.get("origin", p["origin"]),
-                    ",".join(context.user_data.get("seasons", p.get("season", []))),
-                    context.user_data.get("category", p["category"]),
-                    context.user_data.get("size", p["size"]),
-                    context.user_data.get("count", p["count"]),
-                    pid
-                ))
-
-                conn.commit()
-                load_products_from_db()
-
-                await update.message.reply_text(
-                    f"✅ Yangilandi:\n\n"
-                    f"👕 {context.user_data.get('category', p['category'])}\n"
-                    f"📏 {context.user_data.get('size', p['size'])} sm\n"
-                    f"📦 {context.user_data.get('count', p['count'])} ta"
-                )
-                context.user_data.clear()
-        elif context.user_data.get("step") == "edit_gender":
-            gender = text.replace("👦 ", "").replace("👧 ", "")
-            context.user_data["gender"] = gender
-            context.user_data["step"] = "edit_menu"
-            await update.message.reply_text("✅ Jins yangilandi")
-
-
-        elif context.user_data.get("step") == "edit_origin":
-            origin = text.replace("🇺🇿 ", "").replace("🇨🇳 ", "").replace("🇹🇷 ", "").replace("🏭 ", "")
-            context.user_data["origin"] = origin
-            context.user_data["step"] = "edit_menu"
-            await update.message.reply_text("✅ Fabrika yangilandi")
-
-
-        elif context.user_data.get("step") == "edit_season":
-            season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
-            context.user_data["seasons"] = [season]
-
-            context.user_data["step"] = "edit_menu"
-            await update.message.reply_text("✅ Fasl yangilandi")
-
-
-        elif context.user_data.get("step") == "edit_category":
-
-            category = text.lower()
-
-            if "2 talik" in category:
-                category = "2 talik kiyim"
-            elif "3 talik" in category:
-                category = "3 talik kiyim"
-            elif "futbolka" in category:
-                category = "futbolka"
-            elif "shim" in category:
-                category = "shim"
-            elif "qalin" in category:
-                category = "qalin kiyim"
-            elif "shortik" in category:
-                category = "shortik"
-            elif "oyoq" in category:
-                category = "oyoq kiyim"
-            elif "bosh" in category:
-                category = "bosh kiyim"
-            elif "ichki" in category:
-                category = "ichki kiyim"
-
-            context.user_data["category"] = category
-            context.user_data["step"] = "edit_menu"
-
-            await update.message.reply_text("✅ Kategoriya yangilandi")
-
-        elif context.user_data.get("step") == "edit_size":
-            if not text.isdigit():
-                await update.message.reply_text("❌ Faqat raqam yozing (40)")
-                return
-
-            context.user_data["size"] = text
-            context.user_data["step"] = "edit_menu"
-            await update.message.reply_text("✅ Razmer yangilandi")
-
-
-        elif context.user_data.get("step") == "edit_count":
-            if not text.isdigit():
-                await update.message.reply_text("❌ Raqam yoz")
-                return
-
-            context.user_data["count"] = int(text)
-            context.user_data["step"] = "edit_menu"
-            await update.message.reply_text("✅ Soni yangilandi")
 
     except Exception as e:
         print("XATO:", e)
@@ -1479,8 +1285,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    import time
-    print("BUTTON ISHLADI")
+    
     query = update.callback_query
     await query.answer()
 
@@ -1536,7 +1341,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     elif data.startswith("add_"):
-        import time
+        
         product_id = int(data.split("_")[1])
 
         if product_id not in product_locks:
@@ -1586,41 +1391,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("edit_"):
         product_id = int(data.split("_")[1])
 
-        # 🔥 mahsulotni topamiz
-        p = next((x for x in products if x["id"] == product_id), None)
-        if not p:
-            await query.message.reply_text("❌ Topilmadi")
-            return
-
-        # 🔥 eski qiymatlarni yuklab olamiz
+        context.user_data.clear()
+        context.user_data["mode"] = "edit"
         context.user_data["edit_product_id"] = product_id
-        context.user_data["gender"] = p["gender"]
-        context.user_data["origin"] = p["origin"]
-        context.user_data["seasons"] = p.get("season", [])
-        context.user_data["category"] = p["category"]
-        context.user_data["size"] = p["size"]
-        context.user_data["count"] = p["count"]
 
-        context.user_data["step"] = "edit_menu"
+        # 🔥 ENG MUHIM 2 QATOR
+        context.user_data["step"] = "gender"
 
-        keyboard = [
-            ["👦 Jins", "🏭 Fabrika"],
-            ["🌤 Fasl", "📂 Kategoriya"],
-            ["📏 Uzunlik", "📦 Soni"],
-            ["💾 Saqlash"]
-        ]
-
-        await query.message.reply_text(
-            f"✏️ Tahrirlash:\n\n"
-            f"Jins: {p['gender']}\n"
-            f"Fabrika: {p['origin']}\n"
-            f"Fasl: {', '.join(p.get('season', []))}\n"
-            f"Kategoriya: {p['category']}\n"
-            f"📏 {p['size']} sm\n"
-            f"📦 {p['count']} ta\n\n"
-            f"Qaysi qismini o‘zgartirasiz?",
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        )
+        await query.message.reply_text("Kim uchun?")
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
@@ -1989,7 +1767,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = query.from_user.id
         cart = carts.get(user_id, {})
 
-        import time
+        
         now = time.time()
         new_cart = {}
 
@@ -2102,7 +1880,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
     elif data == "checkout":
-        import time
+
         context.user_data["order_started"] = time.time()
         context.user_data["order_step"] = "choose_type"
 
