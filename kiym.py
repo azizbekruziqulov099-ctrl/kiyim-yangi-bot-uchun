@@ -146,8 +146,20 @@ def get_category_buttons(context):
 def filter_check(p, context):
 
     # gender
-    if context.user_data.get("filter_gender"):
-        if p["gender"] != context.user_data.get("filter_gender"):
+    if context.user_data.get("filter_size"):
+        try:
+            size = int(context.user_data.get("filter_size"))
+            p_size = int(p["size"])
+        except:
+            return False
+
+        # 🔥 kategoriya mos bo‘lishi shart
+        if context.user_data.get("filter_category"):
+            if p["category"] != context.user_data.get("filter_category"):
+                return False
+
+        # 🔥 ±1 sm diapazon
+        if abs(p_size - size) > 1:
             return False
 
     # size (faqat bo‘lsa ishlaydi)
@@ -773,7 +785,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["name"] = text
             context.user_data["step"] = "size"
 
-            await update.message.reply_text("🔢 Razmer yozing (masalan 44):")
+            await update.message.reply_text("📏 Uzunlik yozing (sm) (masalan 40):")
             return
         elif context.user_data.get("step") == "size":
             size = text.strip()
@@ -1061,7 +1073,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["filter_category"] = category
             context.user_data["step"] = "write_size"
 
-            await update.message.reply_text("📏 Razmer yozing (masalan 44):")
+            await update.message.reply_text("📏 Uzunlik yozing (sm)\nMasalan: 40")
             return
         elif text == "🚚 Buyurtma berish":
             keyboard = [["🚚 Dastavka", "📍 Olib ketish"],["🔙 Orqaga", "🏠 Bosh menyu"]]
@@ -1331,94 +1343,146 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if text == "👦 Jins":
                 context.user_data["step"] = "edit_gender"
-                await update.message.reply_text("👦 yoki 👧 yozing")
-            
+
+                keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
+
+                await update.message.reply_text(
+                    "Tanlang:",
+                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                )
+
             elif text == "🏭 Fabrika":
                 context.user_data["step"] = "edit_origin"
-                await update.message.reply_text("Vodiy / Xitoy / Turkiya / 8-mart")
-            
+
+                keyboard = [
+                    ["🇺🇿 Vodiy", "🇨🇳 Xitoy"],
+                    ["🇹🇷 Turkiya", "🏭 8-mart fabrika"]
+                ]
+
+                await update.message.reply_text(
+                    "Tanlang:",
+                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                )
+
             elif text == "🌤 Fasl":
                 context.user_data["step"] = "edit_season"
                 await update.message.reply_text("Yozgi / Qishki / Bahor / Kuz")
-            
+
             elif text == "📂 Kategoriya":
                 context.user_data["step"] = "edit_category"
                 await update.message.reply_text("Kategoriya yozing")
-            
+
             elif text == "📏 Uzunlik":
                 context.user_data["step"] = "edit_size"
-                await update.message.reply_text("Uzunlik yozing (44)")
-            
+                await update.message.reply_text("📏 Yangi uzunlik yozing (sm):")
+
             elif text == "📦 Soni":
                 context.user_data["step"] = "edit_count"
                 await update.message.reply_text("Soni yozing (5)")
-            
-        elif text == "💾 Saqlash":
-            pid = context.user_data.get("edit_product_id")
 
-            # size
-            size = context.user_data.get("size")
-            if not size:
-                for p in products:
-                    if p["id"] == pid:
-                        size = p.get("size", "")
-                        break
+            elif text == "💾 Saqlash":
+                pid = context.user_data.get("edit_product_id")
 
-            # count
-            count = context.user_data.get("count")
-            if count is None:
-                for p in products:
-                    if p["id"] == pid:
-                        count = p.get("count", 0)
-                        break
+                # 🔥 eski mahsulotni topamiz
+                p = next((x for x in products if x["id"] == pid), None)
 
-            cur.execute("""
-            UPDATE products
-            SET gender=%s, origin=%s, season=%s, category=%s, size=%s, count=%s
-            WHERE id=%s
-            """, (
-                context.user_data.get("gender"),
-                context.user_data.get("origin"),
-                ",".join(context.user_data.get("seasons") or []),
-                context.user_data.get("category"),
-                size,
-                count,
-                pid
-            ))
+                if not p:
+                    await update.message.reply_text("❌ Mahsulot topilmadi")
+                    context.user_data.clear()
+                    return
 
-            conn.commit()
-            load_products_from_db()
+                cur.execute("""
+                UPDATE products
+                SET gender=%s, origin=%s, season=%s, category=%s, size=%s, count=%s
+                WHERE id=%s
+                """, (
+                    context.user_data.get("gender", p["gender"]),
+                    context.user_data.get("origin", p["origin"]),
+                    ",".join(context.user_data.get("seasons", p.get("season", []))),
+                    context.user_data.get("category", p["category"]),
+                    context.user_data.get("size", p["size"]),
+                    context.user_data.get("count", p["count"]),
+                    pid
+                ))
 
-            await update.message.reply_text("✅ Saqlandi")
+                conn.commit()
+                load_products_from_db()
 
+                await update.message.reply_text(
+                    f"✅ Yangilandi:\n\n"
+                    f"👕 {context.user_data.get('category', p['category'])}\n"
+                    f"📏 {context.user_data.get('size', p['size'])} sm\n"
+                    f"📦 {context.user_data.get('count', p['count'])} ta"
+                )
+                context.user_data.clear()
         elif context.user_data.get("step") == "edit_gender":
-            context.user_data["gender"] = text
+            gender = text.replace("👦 ", "").replace("👧 ", "")
+            context.user_data["gender"] = gender
             context.user_data["step"] = "edit_menu"
+            await update.message.reply_text("✅ Jins yangilandi")
+
 
         elif context.user_data.get("step") == "edit_origin":
-            context.user_data["origin"] = text
+            origin = text.replace("🇺🇿 ", "").replace("🇨🇳 ", "").replace("🇹🇷 ", "").replace("🏭 ", "")
+            context.user_data["origin"] = origin
             context.user_data["step"] = "edit_menu"
+            await update.message.reply_text("✅ Fabrika yangilandi")
+
 
         elif context.user_data.get("step") == "edit_season":
-            context.user_data["seasons"] = [text]
+            season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
+            context.user_data["seasons"] = [season]
+
             context.user_data["step"] = "edit_menu"
+            await update.message.reply_text("✅ Fasl yangilandi")
+
 
         elif context.user_data.get("step") == "edit_category":
-            context.user_data["category"] = text
+
+            category = text.lower()
+
+            if "2 talik" in category:
+                category = "2 talik kiyim"
+            elif "3 talik" in category:
+                category = "3 talik kiyim"
+            elif "futbolka" in category:
+                category = "futbolka"
+            elif "shim" in category:
+                category = "shim"
+            elif "qalin" in category:
+                category = "qalin kiyim"
+            elif "shortik" in category:
+                category = "shortik"
+            elif "oyoq" in category:
+                category = "oyoq kiyim"
+            elif "bosh" in category:
+                category = "bosh kiyim"
+            elif "ichki" in category:
+                category = "ichki kiyim"
+
+            context.user_data["category"] = category
             context.user_data["step"] = "edit_menu"
+
+            await update.message.reply_text("✅ Kategoriya yangilandi")
+
+        elif context.user_data.get("step") == "edit_size":
+            if not text.isdigit():
+                await update.message.reply_text("❌ Faqat raqam yozing (40)")
+                return
+
+            context.user_data["size"] = text
+            context.user_data["step"] = "edit_menu"
+            await update.message.reply_text("✅ Razmer yangilandi")
 
 
         elif context.user_data.get("step") == "edit_count":
             if not text.isdigit():
                 await update.message.reply_text("❌ Raqam yoz")
                 return
+
             context.user_data["count"] = int(text)
             context.user_data["step"] = "edit_menu"
-
-    except Exception as e:
-        print("XATO:", e)
-        await update.message.reply_text("❌ Xatolik yuz berdi. /start bosing")
-        context.user_data.clear()
+            await update.message.reply_text("✅ Soni yangilandi")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import time
@@ -1528,7 +1592,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("edit_"):
         product_id = int(data.split("_")[1])
 
+        # 🔥 mahsulotni topamiz
+        p = next((x for x in products if x["id"] == product_id), None)
+        if not p:
+            await query.message.reply_text("❌ Topilmadi")
+            return
+
+        # 🔥 eski qiymatlarni yuklab olamiz
         context.user_data["edit_product_id"] = product_id
+        context.user_data["gender"] = p["gender"]
+        context.user_data["origin"] = p["origin"]
+        context.user_data["seasons"] = p.get("season", [])
+        context.user_data["category"] = p["category"]
+        context.user_data["size"] = p["size"]
+        context.user_data["count"] = p["count"]
+
         context.user_data["step"] = "edit_menu"
 
         keyboard = [
@@ -1539,11 +1617,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         await query.message.reply_text(
-            "✏️ Qaysi qismini o‘zgartirasiz:",
+            f"✏️ Tahrirlash:\n\n"
+            f"Jins: {p['gender']}\n"
+            f"Fabrika: {p['origin']}\n"
+            f"Fasl: {', '.join(p.get('season', []))}\n"
+            f"Kategoriya: {p['category']}\n"
+            f"📏 {p['size']} sm\n"
+            f"📦 {p['count']} ta\n\n"
+            f"Qaysi qismini o‘zgartirasiz?",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
-        
-
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
