@@ -162,14 +162,6 @@ def filter_check(p, context):
         if abs(p_size - size) > 1:
             return False
 
-    # size (faqat bo‘lsa ishlaydi)
-    if context.user_data.get("filter_size"):
-        size = int(context.user_data.get("filter_size"))
-        p_size = int(p["size"])
-
-        if abs(p_size - size) > 1:
-            return False
-
     # season
     if context.user_data.get("filter_season"):
         seasons = p.get("season", [])
@@ -814,10 +806,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await update.message.reply_text("📦 Nechta bor? (masalan 4):")
 
-        elif text == "📏 Razmer" and context.user_data.get("step") == "edit_menu":
-            context.user_data["step"] = "edit_size"
-            await update.message.reply_text("📏 Yangi razmer yozing (masalan 44):")
-
+    
         elif context.user_data.get("step") == "edit_size":
 
             size = text.strip()
