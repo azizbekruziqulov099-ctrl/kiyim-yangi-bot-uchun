@@ -1473,6 +1473,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["step"] = "edit_menu"
             await update.message.reply_text("✅ Soni yangilandi")
 
+    except Exception as e:
+        print("XATO:", e)
+        await update.message.reply_text("❌ Xatolik yuz berdi")
+        context.user_data.clear()
+
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import time
     print("BUTTON ISHLADI")
