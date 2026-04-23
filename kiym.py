@@ -147,12 +147,13 @@ def filter_check(p, context):
 
     # 🔥 gender
     if context.user_data.get("filter_gender"):
-        if p["gender"].lower() != context.user_data["filter_gender"].lower():
+        if context.user_data["filter_gender"].lower() not in p["gender"].lower():
             return False
 
     # 🔥 origin
+
     if context.user_data.get("filter_origin"):
-        if p["origin"].lower() != context.user_data["filter_origin"].lower():
+        if context.user_data["filter_origin"].lower() not in p["origin"].lower():
             return False
 
     # 🔥 category
@@ -1292,7 +1293,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("g_") or data.startswith("o_") or data.startswith("s_"):
 
         if data.startswith("g_"):
-            context.user_data["filter_gender"] = data[2:]
+            g = data[2:]
+
+            if "o‘g" in g or "og" in g:
+                context.user_data["filter_gender"] = "o‘g‘il"
+            else:
+                context.user_data["filter_gender"] = "qiz"
 
         elif data.startswith("o_"):
             context.user_data["filter_origin"] = data[2:]
