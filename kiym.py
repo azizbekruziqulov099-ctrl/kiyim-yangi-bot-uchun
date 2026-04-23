@@ -147,46 +147,66 @@ def filter_check(p, context):
 
     # 🔥 gender
     if context.user_data.get("filter_gender"):
-        if context.user_data["filter_gender"].lower() not in p["gender"].lower():
+        if context.user_data["filter_gender"].lower() not in str(p.get("gender","")).lower():
             return False
 
     # 🔥 origin
-
     if context.user_data.get("filter_origin"):
-        if context.user_data["filter_origin"].lower() not in p["origin"].lower():
+        if context.user_data["filter_origin"].lower() not in str(p.get("origin","")).lower():
             return False
 
     # 🔥 category
     if context.user_data.get("filter_category"):
-        if context.user_data["filter_category"].lower() not in p["category"].lower():
+        if context.user_data["filter_category"].lower() not in str(p.get("category","")).lower():
             return False
 
-    # 🔥 season (ENG MUHIM FIX)
+    # 🔥 season
     if context.user_data.get("filter_season"):
-        season = context.user_data["filter_season"].lower()
+        season = context.user_data["filter_season"].lower().strip()
 
         p_seasons = p.get("season", "")
 
         if isinstance(p_seasons, str):
             p_seasons = p_seasons.lower().split(",")
+
         p_seasons = [s.strip().lower() for s in p_seasons]
-        season = season.strip().lower()
+
         if season not in p_seasons:
             return False
 
-    # 🔥 size (ENG MUHIM FIX)
+    # 🔥 size (FULL FIX 🔥)
     if context.user_data.get("filter_size"):
         try:
             size = int(context.user_data["filter_size"])
-            p_size = int(str(p["size"]).replace("sm", "").strip())
+
+            raw = str(p.get("size", "")).lower().replace("sm", "").strip()
+
+            # 🔥 diapazon bo‘lsa (80-85)
+            if "-" in raw:
+                parts = raw.split("-")
+
+                if len(parts) < 2 or not parts[0].isdigit() or not parts[1].isdigit():
+                    return False
+
+                s1, s2 = int(parts[0]), int(parts[1])
+
+                if not (s1 <= size <= s2):
+                    return False
+
+            else:
+                if not raw.isdigit():
+                    return False
+
+                p_size = int(raw)
+
+                if abs(p_size - size) > 1:
+                    return False
+
         except:
             return False
 
-        if abs(p_size - size) > 1:
-            return False
-
     # 🔥 mavjudlik
-    if (p["count"] - p.get("reserved", 0)) <= 0:
+    if (p.get("count", 0) - p.get("reserved", 0)) <= 0:
         return False
 
     return True
