@@ -157,7 +157,7 @@ def filter_check(p, context):
 
     # 🔥 category
     if context.user_data.get("filter_category"):
-        if p["category"].lower() != context.user_data["filter_category"].lower():
+        if context.user_data["filter_category"].lower() not in p["category"].lower():
             return False
 
     # 🔥 season (ENG MUHIM FIX)
@@ -168,7 +168,8 @@ def filter_check(p, context):
 
         if isinstance(p_seasons, str):
             p_seasons = p_seasons.lower().split(",")
-
+        p_seasons = [s.strip().lower() for s in p_seasons]
+        season = season.strip().lower()
         if season not in p_seasons:
             return False
 
