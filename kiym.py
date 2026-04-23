@@ -754,6 +754,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             context.user_data["count"] = int(text)
 
+            # 🔥 xavfsiz olish
+            photo = context.user_data.get("photo")
+            gender = context.user_data.get("gender")
+            origin = context.user_data.get("origin")
+            seasons = context.user_data.get("seasons", [])
+            category = context.user_data.get("category")
+            name = context.user_data.get("name")
+            size = context.user_data.get("size")
+            price = context.user_data.get("price")
+            count = context.user_data.get("count")
+
             if context.user_data.get("mode") == "edit":
                 pid = context.user_data.get("edit_product_id")
 
@@ -763,15 +774,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     name=%s, size=%s, price=%s, count=%s
                 WHERE id=%s
                 """, (
-                    context.user_data["photo"],
-                    context.user_data["gender"],
-                    context.user_data["origin"],
-                    ",".join(context.user_data.get("seasons", [])),
-                    context.user_data["category"],
-                    context.user_data["name"],
-                    context.user_data["size"],
-                    context.user_data["price"],
-                    context.user_data["count"],
+                    photo, gender, origin,
+                    ",".join(seasons),
+                    category, name, size, price, count,
                     pid
                 ))
 
@@ -782,19 +787,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 INSERT INTO products (photo, gender, origin, season, category, name, size, price, count, reserved)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """, (
-                    context.user_data["photo"],
-                    context.user_data["gender"],
-                    context.user_data["origin"],
-                    ",".join(context.user_data.get("seasons", [])),
-                    context.user_data["category"],
-                    context.user_data["name"],
-                    context.user_data["size"],
-                    context.user_data["price"],
-                    context.user_data["count"],
+                    photo, gender, origin,
+                    ",".join(seasons),
+                    category, name, size, price, count,
                     0
                 ))
 
-                await update.message.reply_text("✅ Yangi mahsulot qo‘shildi!")
+                await update.message.reply_text("✅ Qo‘shildi!")
 
             conn.commit()
             load_products_from_db()
@@ -1398,7 +1397,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 🔥 ENG MUHIM 2 QATOR
         context.user_data["step"] = "gender"
 
-        await query.message.reply_text("Kim uchun?")
+        keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
+
+        await query.message.reply_text(
+            "Kim uchun?",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
