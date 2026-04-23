@@ -1274,23 +1274,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=MAIN_MENU
             )
             return
-        elif context.user_data.get("step") == "inline_all":
-            size = text.strip()
-
-            if not size.isdigit():
-                await update.message.reply_text("❌ Razmer raqam bo‘lsin (44)")
-                return
-
-            context.user_data["filter_size"] = size
-
-            await update.message.reply_text(
-                f"🔎 Tanlang:\n\n"
-                f"Jins: {context.user_data.get('filter_gender','-')}\n"
-                f"Fabrika: {context.user_data.get('filter_origin','-')}\n"
-                f"Fasl: {context.user_data.get('filter_season','-')}\n",
-                reply_markup=get_filter_menu(context.user_data)
-            )
-
 
     except Exception as e:
         print("XATO:", e)
@@ -1404,11 +1387,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("edit_"):
         product_id = int(data.split("_")[1])
 
+        # 🔥 MAHSULOTNI TOPAMIZ
+        p = next((x for x in products if x["id"] == product_id), None)
+
+        if not p:
+            await query.message.reply_text("❌ Topilmadi")
+            return
+
         context.user_data.clear()
+
+        # 🔥 MODE
         context.user_data["mode"] = "edit"
         context.user_data["edit_product_id"] = product_id
 
-        # 🔥 ENG MUHIM 2 QATOR
+        # 🔥 ESKI DATA NI SAQLAYMIZ
+        context.user_data["photo"] = p["photo"]
+        context.user_data["gender"] = p["gender"]
+        context.user_data["origin"] = p["origin"]
+        context.user_data["seasons"] = p["season"] if isinstance(p["season"], list) else p["season"].split(",")
+        context.user_data["category"] = p["category"]
+        context.user_data["name"] = p["name"]
+        context.user_data["size"] = p["size"]
+        context.user_data["price"] = p["price"]
+        context.user_data["count"] = p["count"]
+
+        # 🔥 KEYIN EDIT BOSHLAYDI
         context.user_data["step"] = "gender"
 
         keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
