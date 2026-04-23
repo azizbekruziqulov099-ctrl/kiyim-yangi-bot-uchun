@@ -63,6 +63,16 @@ ORIGINS = [
     "🇹🇷 Turkiya",
     "🏭 8-mart fabrika"
 ]
+
+def build_filter_text(context):
+    return (
+        "🔎 Tanlang:\n\n"
+        f"Jins: {context.user_data.get('filter_gender', '-')}\n"
+        f"Fabrika: {context.user_data.get('filter_origin', '-')}\n"
+        f"Fasl: {context.user_data.get('filter_season', '-')}\n"
+        f"Razmer: {context.user_data.get('filter_size', '-')}"
+    )
+
 def get_filter_menu(user_data):
     g = user_data.get("filter_gender")
     o = user_data.get("filter_origin")
@@ -177,13 +187,19 @@ def filter_check(p, context):
     if context.user_data.get("filter_size"):
         try:
             size = int(context.user_data["filter_size"])
-            p_size = int(str(p["size"]).replace("sm", "").strip())
+
+            raw_size = str(p.get("size", "")).lower().replace("sm", "").strip()
+
+            if not raw_size.isdigit():
+                return False
+
+            p_size = int(raw_size)
+
         except:
             return False
 
         if abs(p_size - size) > 1:
             return False
-
     # 🔥 mavjudlik
     if (p["count"] - p.get("reserved", 0)) <= 0:
         return False
@@ -367,13 +383,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif text == "🔍 Qidirish":
             context.user_data.clear()
 
-            await update.message.reply_text(
-                "🔎 Tanlang:\n\nJins: -\nFabrika: -\nFasl: -\nRazmer: -\n\n✍️ Razmerni shu yerga yozing (44)",
+            keyboard = [
+                ["👦 O‘g‘il", "👧 Qiz"],
+                ["🇺🇿 Vodiy", "🇨🇳 Xitoy"],
+                ["🌤 Yozgi", "❄️ Qishki"],
+                ["🌸 Bahor", "🍂 Kuz"],
+                ["📏 Razmer kiritish"],
+                ["✅ Tanlash", "♻️ Tozalash"]
+            ]
 
-                reply_markup=get_filter_menu(context.user_data)
+            await update.message.reply_text(
+                build_filter_text(context),
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
 
-            context.user_data["step"] = "inline_all"
+            await update.message.reply_text(
+                build_filter_text(context),
+                reply_markup=get_filter_menu(context.user_data)
+            )
 
         elif text == "📢 Reklama":
             if update.effective_user.id != ADMIN_ID:
@@ -1274,23 +1301,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=MAIN_MENU
             )
             return
-        elif context.user_data.get("step") == "inline_all":
-            size = text.strip()
-
-            if not size.isdigit():
-                await update.message.reply_text("❌ Razmer raqam bo‘lsin (44)")
-                return
-
-            context.user_data["filter_size"] = size
-
-            await update.message.reply_text(
-                f"🔎 Tanlang:\n\n"
-                f"Jins: {context.user_data.get('filter_gender','-')}\n"
-                f"Fabrika: {context.user_data.get('filter_origin','-')}\n"
-                f"Fasl: {context.user_data.get('filter_season','-')}\n",
-                reply_markup=get_filter_menu(context.user_data)
-            )
-
 
     except Exception as e:
         print("XATO:", e)
@@ -1323,8 +1333,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Jins: {context.user_data.get('filter_gender','-')}\n"
             f"Fabrika: {context.user_data.get('filter_origin','-')}\n"
             f"Fasl: {context.user_data.get('filter_season','-')}\n"
-            f"Razmer: {context.user_data.get('filter_size','-')}\n\n"
-            f"✍️ Razmerni shu yerga yozing (masalan 44)",
+            f"Razmer: {context.user_data.get('filter_size','-')}\n\n",
             reply_markup=get_filter_menu(context.user_data)
         )
         return
