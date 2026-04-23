@@ -145,32 +145,45 @@ def get_category_buttons(context):
 
 def filter_check(p, context):
 
+    # 🔥 gender
     if context.user_data.get("filter_gender"):
-        if p["gender"] != context.user_data["filter_gender"]:
+        if p["gender"].lower() != context.user_data["filter_gender"].lower():
             return False
 
+    # 🔥 origin
     if context.user_data.get("filter_origin"):
-        if p["origin"] != context.user_data["filter_origin"]:
+        if p["origin"].lower() != context.user_data["filter_origin"].lower():
             return False
 
+    # 🔥 category
     if context.user_data.get("filter_category"):
-        if p["category"] != context.user_data["filter_category"]:
+        if p["category"].lower() != context.user_data["filter_category"].lower():
             return False
 
+    # 🔥 season (ENG MUHIM FIX)
+    if context.user_data.get("filter_season"):
+        season = context.user_data["filter_season"].lower()
+
+        p_seasons = p.get("season", "")
+
+        if isinstance(p_seasons, str):
+            p_seasons = p_seasons.lower().split(",")
+
+        if season not in p_seasons:
+            return False
+
+    # 🔥 size (ENG MUHIM FIX)
     if context.user_data.get("filter_size"):
         try:
             size = int(context.user_data["filter_size"])
-            p_size = int(p["size"])
+            p_size = int(str(p["size"]).replace("sm", "").strip())
         except:
             return False
 
         if abs(p_size - size) > 1:
             return False
 
-    if context.user_data.get("filter_season"):
-        if context.user_data["filter_season"] not in p.get("season", []):
-            return False
-
+    # 🔥 mavjudlik
     if (p["count"] - p.get("reserved", 0)) <= 0:
         return False
 
