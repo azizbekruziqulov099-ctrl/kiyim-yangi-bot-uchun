@@ -69,6 +69,8 @@ def get_filter_menu(user_data):
     s = user_data.get("filter_season")
 
     return InlineKeyboardMarkup([
+
+        # 👦 👧
         [
             InlineKeyboardButton(
                 f"👦 O‘g‘il {'✅' if g=='o‘g‘il' else ''}",
@@ -79,6 +81,10 @@ def get_filter_menu(user_data):
                 callback_data="g_qiz"
             )
         ],
+
+        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
+
+        # 🇺🇿 🇨🇳
         [
             InlineKeyboardButton(
                 f"🇺🇿 Vodiy {'✅' if o=='Vodiy' else ''}",
@@ -89,6 +95,10 @@ def get_filter_menu(user_data):
                 callback_data="o_Xitoy"
             )
         ],
+
+        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
+
+        # 🇹🇷 🏭
         [
             InlineKeyboardButton(
                 f"🇹🇷 Turkiya {'✅' if o=='Turkiya' else ''}",
@@ -99,6 +109,10 @@ def get_filter_menu(user_data):
                 callback_data="o_8-mart fabrika"
             )
         ],
+
+        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
+
+        # ☀️ ❄️
         [
             InlineKeyboardButton(
                 f"☀️ Yozgi {'✅' if s=='Yozgi' else ''}",
@@ -109,6 +123,10 @@ def get_filter_menu(user_data):
                 callback_data="s_Qishki"
             )
         ],
+
+        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
+
+        # 🌸 🍂
         [
             InlineKeyboardButton(
                 f"🌸 Bahor {'✅' if s=='Bahor' else ''}",
@@ -119,6 +137,10 @@ def get_filter_menu(user_data):
                 callback_data="s_Kuz"
             )
         ],
+
+        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
+
+        # ✅ 🔄
         [
             InlineKeyboardButton("✅ Tanlash", callback_data="apply"),
             InlineKeyboardButton("🔄 Tozalash", callback_data="reset")
@@ -127,18 +149,16 @@ def get_filter_menu(user_data):
 def get_category_buttons(context):
     return [
         [f"👕 2 talik ({count_products(context,lambda p: p['category'].lower()=='2 talik kiyim')})",
-         f"👕 3 talik ({count_products(context,lambda p: p['category'].lower()=='3 talik kiyim')})"],
+         f"👕 3 talik ({count_products(context,lambda p: p['category'].lower()=='3 talik kiyim')})",
+         f"👕 Futbolka ({count_products(context,lambda p: p['category'].lower()=='futbolka')})"],
 
-        [f"👕 Futbolka ({count_products(context,lambda p: p['category'].lower()=='futbolka')})",
-         f"👖 Shim ({count_products(context,lambda p: p['category'].lower()=='shim')})"],
-
-        [f"🧥 Qalin ({count_products(context,lambda p: p['category'].lower()=='qalin kiyim')})",
+         [f"👖 Shim ({count_products(context,lambda p: p['category'].lower()=='shim')})",
+          f"🧥 Qalin ({count_products(context,lambda p: p['category'].lower()=='qalin kiyim')})",
          f"🩳 Shortik ({count_products(context,lambda p: p['category'].lower()=='shortik')})"],
 
         [f"👟 Oyoq ({count_products(context,lambda p: p['category'].lower()=='oyoq kiyim')})",
-         f"🧢 Bosh ({count_products(context,lambda p: p['category'].lower()=='bosh kiyim')})"],
-
-        [f"🩲 Ichki ({count_products(context,lambda p: p['category'].lower()=='ichki kiyim')})"],
+         f"🧢 Bosh ({count_products(context,lambda p: p['category'].lower()=='bosh kiyim')})",
+         f"🩲 Ichki ({count_products(context,lambda p: p['category'].lower()=='ichki kiyim')})"],
 
         ["🔙 Orqaga", "🏠 Bosh menyu"]
     ]
@@ -389,8 +409,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
 
             await update.message.reply_text(
-                "🔎 Tanlang:\n\nJins: -\nFabrika: -\nFasl: -\nRazmer: -\n\n✍️ Razmerni shu yerga yozing (44)",
-
+                "🔎 Tanlang:\n\nJins: -\nFabrika: -\nFasl: -\n\n",
                 reply_markup=get_filter_menu(context.user_data)
             )
 
@@ -1330,14 +1349,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔎 Tanlang:\n\n"
             f"Jins: {context.user_data.get('filter_gender','-')}\n"
             f"Fabrika: {context.user_data.get('filter_origin','-')}\n"
-            f"Fasl: {context.user_data.get('filter_season','-')}\n"
-            f"Razmer: {context.user_data.get('filter_size','-')}\n\n"
-            f"✍️ Razmerni shu yerga yozing (masalan 44)",
+            f"Fasl: {context.user_data.get('filter_season','-')}\n",
             reply_markup=get_filter_menu(context.user_data)
         )
         return
-
-
     # ===== RESET =====
     if data == "reset":
         context.user_data.clear()
@@ -1412,16 +1427,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("edit_"):
         product_id = int(data.split("_")[1])
 
-        context.user_data.clear()
+        # 🔥 mahsulotni topamiz
+        old_product = next((x for x in products if x["id"] == product_id), None)
 
-        # 🔥 MUHIM: EDIT MODE
-        context.user_data["mode"] = "edit"
-        context.user_data["edit_product_id"] = product_id
+        if not old_product:
+            await query.message.reply_text("❌ Topilmadi")
+            return
 
-        # 🔥 YANGI QO‘SHISH FLOW BOSHLANADI
-        context.user_data["step"] = "photo"
+        # 🔥 ESKI POSTNI O‘CHIRAMIZ
+        try:
+            await query.message.delete()
+        except:
+            pass
 
-        await query.message.reply_text("📸 Rasm yuboring:")
+        # 🔥 SHU RASMNI QAYTA YUBORAMIZ (YANGI POST EFFECT)
+        await context.bot.send_photo(
+            chat_id=query.message.chat_id,
+            photo=old_product["photo"],   # 🔥 eski rasm
+            caption=f"{old_product['name']}\n📏 {old_product['size']}\n💰 {old_product['price']}"
+        )
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
@@ -1715,8 +1739,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ADMIN_PHONE = "+998915388499"
         ADDRESS = "Samarqand vil. Pastdarg'om tum. charxin shax. charos ko‘chasi 53 uy Adminlar aloqaga chiqishadi va olib ketish vaqtini keishiladi."
 
-        LAT = 39.690149
-        LON = 66.824828
+        #LAT = 39.690149
+        #LON = 66.824828
 
         # USERGA
         await context.bot.send_message(
