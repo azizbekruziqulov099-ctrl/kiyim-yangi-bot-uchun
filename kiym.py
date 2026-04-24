@@ -178,9 +178,10 @@ def filter_check(p, context):
 
         if not prod_cat:
             return False
-    
-        if user_cat not in prod_cat:   
+
+        if user_cat not in prod_cat:   # 👈 SHUNI QO‘Y
             return False
+
     # 🔥 season (TOZA)
     s = context.user_data.get("filter_season")
     if s:
@@ -1082,7 +1083,25 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             found = False
 
             for p in products:
-                if filter_check(p, context):
+                try:
+                    if filter_check(p, context):
+                        found = True
+
+                        keyboard = [
+                            [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
+                        ]
+
+                        await update.message.reply_photo(
+                            photo=p["photo"],
+                            caption=f"{p.get('name','')}\n📏 {p.get('size','')}\n💰 {p.get('price','')}",
+                            reply_markup=InlineKeyboardMarkup(keyboard)
+                        )
+                except Exception as e:
+                    print("BROKEN PRODUCT:", p, "ERROR:", e)
+                    continue   # 👈 xatoni tashlab ketadi
+
+            if not found:
+                await update.message.reply_text("❌ Mahsulot yo‘q")
                     found = True
 
                     keyboard = [
