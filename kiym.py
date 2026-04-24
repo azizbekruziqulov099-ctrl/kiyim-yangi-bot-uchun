@@ -159,76 +159,64 @@ def get_category_buttons(context):
 def filter_check(p, context):
 
     # 🔥 gender
-    if context.user_data.get("filter_gender"):
-        if context.user_data["filter_gender"].lower() not in str(p.get("gender","")).lower():
+    g = context.user_data.get("filter_gender")
+    if g:
+        if g.lower() not in str(p.get("gender", "")).lower():
             return False
 
     # 🔥 origin
-    if context.user_data.get("filter_origin"):
-        if context.user_data["filter_origin"].lower() not in str(p.get("origin","")).lower():
+    o = context.user_data.get("filter_origin")
+    if o:
+        if o.lower() not in str(p.get("origin", "")).lower():
             return False
 
     # 🔥 category
-# 🔥 category (FIX)
-# 🔥 category (FIX)
-    if context.user_data.get("filter_category"):
-        user_cat = context.user_data["filter_category"].strip().lower()
-        prod_cat = str(p.get("category","")).strip().lower()
+    c = context.user_data.get("filter_category")
+    if c:
+        user_cat = str(c).strip().lower()
+        prod_cat = str(p.get("category", "")).strip().lower()
+
+        if not prod_cat:
+            return False
 
         if user_cat != prod_cat:
             return False
 
-    # 🔥 season
-    season = context.user_data.get("filter_season")
+    # 🔥 season (TOZA)
+    s = context.user_data.get("filter_season")
+    if s:
+        season = str(s).strip().lower()
 
-    if season:
-        season = str(season).lower().strip()
+        p_seasons = p.get("season", [])
 
-        p_seasons = p.get("season", "")
+        # har doim listga aylantiramiz
+        if not isinstance(p_seasons, list):
+            p_seasons = str(p_seasons).split(",")
 
-        if isinstance(p_seasons, str):
-            p_seasons = p_seasons.lower().split(",")
-
-        p_seasons = [str(s).strip().lower() for s in p_seasons]
-
-        if season not in p_seasons:
-            return False
-
-        p_seasons = p.get("season", "")
-
-        if isinstance(p_seasons, str):
-            p_seasons = p_seasons.lower().split(",")
-
-        p_seasons = [s.strip().lower() for s in p_seasons]
+        p_seasons = [str(x).strip().lower() for x in p_seasons]
 
         if season not in p_seasons:
             return False
 
-    # 🔥 size (FULL FIX 🔥)
+    # 🔥 size
     if context.user_data.get("filter_size"):
         try:
             size = int(context.user_data["filter_size"])
-
             raw = str(p.get("size", "")).lower().replace("sm", "").strip()
 
-            # 🔥 diapazon bo‘lsa (80-85)
             if "-" in raw:
                 parts = raw.split("-")
-
                 if len(parts) < 2 or not parts[0].isdigit() or not parts[1].isdigit():
                     return False
 
                 s1, s2 = int(parts[0]), int(parts[1])
-
                 if not (s1 <= size <= s2):
                     return False
-
             else:
                 if not raw.isdigit():
                     return False
 
                 p_size = int(raw)
-
                 if abs(p_size - size) > 1:
                     return False
 
