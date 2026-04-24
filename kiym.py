@@ -170,7 +170,13 @@ def filter_check(p, context):
 
     # 🔥 category
     if context.user_data.get("filter_category"):
-        if context.user_data["filter_category"].lower() not in str(p.get("category","")).lower():
+        user_cat = context.user_data["filter_category"].strip().lower()
+        prod_cat = str(p.get("category","")).strip().lower()
+
+        print("USER:", user_cat)
+        print("PROD:", prod_cat)
+
+        if user_cat != prod_cat:
             return False
 
     # 🔥 season
@@ -313,6 +319,18 @@ CATEGORIES = [
     "🩲 Ichki kiyim"
 ]
 
+async def start_photo_flow(context, chat_id, file_id):
+    # 🔥 bu photo_handler ichidagi boshlanish logikasi
+    context.user_data.clear()
+    context.user_data["photo"] = file_id
+    context.user_data["step"] = "gender"
+
+    keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="Kim uchun?",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
 # START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -341,10 +359,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 # RASM QABUL (ADMIN)
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    # 🔥 admin yoki bot yuborgan rasmni qabul qiladi
+    if update.effective_user.id != ADMIN_ID and not update.message.from_user.is_bot:
         return
 
-    # 🔥 HAR DOIM yangi boshlaydi (editdan keyin ham)
     context.user_data.clear()
 
     context.user_data["photo"] = update.message.photo[-1].file_id
@@ -759,7 +777,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif "ichki" in category:
                 category = "ichki kiyim"
 
-            context.user_data["category"] = category
+            context.user_data["category"] = category.strip().lower()
             context.user_data["step"] = "name"
 
             await update.message.reply_text("Nomini yozing:")
@@ -1429,17 +1447,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("❌ Topilmadi")
             return
 
-        # 🔥 eski mahsulotni o‘chir
+        # eski mahsulotni o‘chir
         cur.execute("DELETE FROM products WHERE id=%s", (product_id,))
         conn.commit()
         load_products_from_db()
 
-        # 🔥 rasmni qayta tashla (go‘yoki admin yuborganday)
+        # bot rasmni chiqaradi
         await context.bot.send_photo(
             chat_id=query.message.chat_id,
             photo=old_product["photo"]
         )
 
+        # 🔥 ENG MUHIM — bot yuborgan rasmni ham ishlatamiz
+        await start_photo_flow(context, query.message.chat_id, old_product["photo"])
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
