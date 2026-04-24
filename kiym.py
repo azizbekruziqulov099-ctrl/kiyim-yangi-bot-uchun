@@ -200,48 +200,37 @@ def filter_check(p, context):
     # 🔥 size
     if context.user_data.get("filter_size"):
         size_text = context.user_data.get("filter_size")
-
-        # ❗ noto‘g‘ri bo‘lsa — skip qilamiz (lekin return qilmaymiz)
-        if not str(size_text).isdigit():
-            pass
-        else:
+        if str(size_text).isdigit():
             size = int(size_text)
-
             raw = str(p.get("size") or "").lower().replace("sm", "").strip()
 
             if raw == "":
+                print(f"DEBUG: {p['name']} - o'lcham bo'sh")
                 return False
 
             if "-" in raw:
                 parts = raw.split("-")
-                if len(parts) < 2:
-                    return False
-
-                s1 = parts[0].strip()
-                s2 = parts[1].strip()
-
-                if not s1.isdigit() or not s2.isdigit():
-                    return False
-
-                s1, s2 = int(s1), int(s2)
-
-                if not (s1 <= size <= s2):
-                    return False
-
+                if len(parts) >= 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                    s1, s2 = int(parts[0]), int(parts[1])
+                    if not (s1 <= size <= s2):
+                        print(f"DEBUG: {p['name']} - o'lcham diapazonga tushmadi ({s1}-{s2})")
+                        return False
+                else: return False
             else:
-                if not raw.isdigit():
-                    return False
-
+                if not raw.isdigit(): return False
                 p_size = int(raw)
-
                 if abs(p_size - size) > 1:
+                    print(f"DEBUG: {p['name']} - o'lcham mos kelmadi (P:{p_size}, U:{size})")
                     return False
-    # 🔥 mavjudlik
-    if (p.get("count", 0) - p.get("reserved", 0)) <= 0:
+
+    # 🔥 mavjudlik (Eng ko'p xato shu yerda bo'ladi)
+    available = p.get("count", 0) - p.get("reserved", 0)
+    if available <= 0:
+        print(f"DEBUG: {p['name']} - sotuvda qolmagan yoki hammasi rezervda")
         return False
-    if not result:
-        print(f"Mahsulot {p['name']} filtrdan o'tmadi. Sabab: ...")
-    return result
+
+    # Agar barcha shartlardan o'tsa
+    return True 
 def clean_cart(user_id, context=None):
     
     now = time.time()
