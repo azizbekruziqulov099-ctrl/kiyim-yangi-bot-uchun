@@ -675,7 +675,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.user_data["step"] = "choose_type"
 
                 keyboard = [
-                    ["📏 Razmer bo‘yicha", "📂 Umumiy"],
+                    ["📏 Razmer bo‘yicha", "📦 Barchasi", "📂 Umumiy"],
                     ["🔙 Orqaga", "🏠 Bosh menyu"]
                 ]
 
@@ -785,6 +785,51 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await update.message.reply_text("Nomini yozing:")
             return
+
+        elif text == "📦 Barchasi":
+            context.user_data.clear()
+            context.user_data["mode"] = "all"
+            context.user_data["step"] = "all_season"
+
+            keyboard = [["☀️ Yozgi", "❄️ Qishki"], ["🌸 Bahor", "🍂 Kuz"]]
+
+            await update.message.reply_text(
+                "Fasl tanlang:",
+                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            )
+        elif context.user_data.get("step") == "all_season":
+
+            season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "").strip().lower()
+
+            found = False
+
+            for p in products:
+                try:
+                    p_seasons = p.get("season", [])
+
+                    if not isinstance(p_seasons, list):
+                        p_seasons = str(p_seasons).split(",")
+
+                    p_seasons = [str(s).strip().lower() for s in p_seasons]
+
+                    if season in p_seasons:
+                        found = True
+
+                        await update.message.reply_photo(
+                            photo=p.get("photo"),
+                            caption=f"{p.get('name','')}\n📏 {p.get('size','')}\n💰 {p.get('price','')}"
+                        )
+
+                except Exception as e:
+                    print("XATO:", p, e)
+                    continue
+
+            if not found:
+                await update.message.reply_text("❌ Mahsulot yo‘q")
+
+            context.user_data.clear()
+
+
         elif context.user_data.get("step") == "name":
             context.user_data["name"] = text
             context.user_data["step"] = "size"
