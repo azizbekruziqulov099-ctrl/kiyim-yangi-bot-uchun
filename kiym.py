@@ -1114,7 +1114,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         found = True
 
                         keyboard = [
-                            [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
+                            [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")],
+                            [InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
+                            InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")]
                         ]
 
                         name = str(p.get("name", "Noma’lum"))
