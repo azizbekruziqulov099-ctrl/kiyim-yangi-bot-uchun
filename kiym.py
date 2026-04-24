@@ -239,8 +239,9 @@ def filter_check(p, context):
     # 🔥 mavjudlik
     if (p.get("count", 0) - p.get("reserved", 0)) <= 0:
         return False
-
-    return True
+    if not result:
+        print(f"Mahsulot {p['name']} filtrdan o'tmadi. Sabab: ...")
+    return result
 def clean_cart(user_id, context=None):
     
     now = time.time()
