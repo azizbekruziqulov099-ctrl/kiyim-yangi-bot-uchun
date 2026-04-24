@@ -179,8 +179,20 @@ def filter_check(p, context):
             return False
 
     # 🔥 season
-    if context.user_data.get("filter_season"):
-        season = context.user_data["filter_season"].lower().strip()
+    season = context.user_data.get("filter_season")
+
+    if season:
+        season = str(season).lower().strip()
+
+        p_seasons = p.get("season", "")
+
+        if isinstance(p_seasons, str):
+            p_seasons = p_seasons.lower().split(",")
+
+        p_seasons = [str(s).strip().lower() for s in p_seasons]
+
+        if season not in p_seasons:
+            return False
 
         p_seasons = p.get("season", "")
 
