@@ -1130,17 +1130,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for p in products:
                 try:
                     if filter_check(p, context):
-                        found = True
-
-                        keyboard = [
-                            [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
-                        ]
-
-                        await update.message.reply_photo(
-                            photo=p["photo"],
-                            caption=f"{p.get('name','')}\n📏 {p.get('size','')}\n💰 {p.get('price','')}",
-                            reply_markup=InlineKeyboardMarkup(keyboard)
-                        )
+                        
                 except Exception as e:
                     print("BROKEN PRODUCT:", p, "ERROR:", e)
                     continue   # 👈 xatoni tashlab ketadi
