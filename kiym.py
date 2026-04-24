@@ -343,6 +343,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
+
+    # 🔥 HAR DOIM yangi boshlaydi (editdan keyin ham)
+    context.user_data.clear()
+
     context.user_data["photo"] = update.message.photo[-1].file_id
     context.user_data["step"] = "gender"
 
@@ -1420,25 +1424,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("edit_"):
         product_id = int(data.split("_")[1])
 
-        # 🔥 mahsulotni topamiz
         old_product = next((x for x in products if x["id"] == product_id), None)
-
         if not old_product:
             await query.message.reply_text("❌ Topilmadi")
             return
 
-        # 🔥 ESKI POSTNI O‘CHIRAMIZ
-        try:
-            await query.message.delete()
-        except:
-            pass
+        # 🔥 eski mahsulotni o‘chir
+        cur.execute("DELETE FROM products WHERE id=%s", (product_id,))
+        conn.commit()
+        load_products_from_db()
 
-        # 🔥 SHU RASMNI QAYTA YUBORAMIZ (YANGI POST EFFECT)
+        # 🔥 rasmni qayta tashla (go‘yoki admin yuborganday)
         await context.bot.send_photo(
             chat_id=query.message.chat_id,
-            photo=old_product["photo"],   # 🔥 eski rasm
-            caption=f"{old_product['name']}\n📏 {old_product['size']}\n💰 {old_product['price']}"
+            photo=old_product["photo"]
         )
+
     elif data.startswith("delete_"):
         if query.from_user.id != ADMIN_ID:
             return
