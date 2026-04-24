@@ -178,10 +178,9 @@ def filter_check(p, context):
 
         if not prod_cat:
             return False
-
-        if user_cat != prod_cat:
+    
+        if user_cat not in prod_cat:   
             return False
-
     # 🔥 season (TOZA)
     s = context.user_data.get("filter_season")
     if s:
