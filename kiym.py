@@ -813,7 +813,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     p_seasons = [str(s).strip().lower() for s in p_seasons]
 
                     if season in p_seasons:
-                        found = True
+                        found = True   # ✅ TO‘G‘RI JOY
 
                         await update.message.reply_photo(
                             photo=p.get("photo"),
