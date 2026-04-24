@@ -169,12 +169,11 @@ def filter_check(p, context):
             return False
 
     # 🔥 category
+# 🔥 category (FIX)
+# 🔥 category (FIX)
     if context.user_data.get("filter_category"):
         user_cat = context.user_data["filter_category"].strip().lower()
         prod_cat = str(p.get("category","")).strip().lower()
-
-        print("USER:", user_cat)
-        print("PROD:", prod_cat)
 
         if user_cat != prod_cat:
             return False
@@ -1054,7 +1053,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 found = False
 
                 for p in products:
-                    if category in p["category"].lower():
+                    if category.strip().lower() == str(p.get("category","")).strip().lower():
 
                         found = True
 
