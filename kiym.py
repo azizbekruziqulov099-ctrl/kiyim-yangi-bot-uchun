@@ -8,6 +8,8 @@ from telegram.ext import CallbackQueryHandler
 import asyncio
 import os
 import psycopg2
+from telegram import InputMediaPhoto
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 conn = psycopg2.connect(DATABASE_URL)
@@ -1098,9 +1100,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["filter_category"] = category
             # 🔥 ADMIN bo‘lsa darrov chiqaramiz
 
+            # ===== ADMIN =====
             if update.effective_user.id == ADMIN_ID:
 
-                found = False
+                media = []
+                products_map = []
 
                 for p in products:
                     try:
@@ -1111,28 +1115,101 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if available <= 0:
                             continue
 
-                        found = True
+                        if len(media) >= 10:
+                            break
 
-                        keyboard = [
-                            [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")],
-                            [InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
-                            InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")]
-                        ]
-
-                        name = str(p.get("name", "Noma’lum"))
-                        size = str(p.get("size", "-"))
-                        price = str(p.get("price", "-"))
-
-                        await update.message.reply_photo(
-                            photo=p.get("photo"),
-                            caption=f"{name}\n📏 {size}\n💰 {price}",
-                            reply_markup=InlineKeyboardMarkup(keyboard)
+                        media.append(
+                            InputMediaPhoto(
+                                media=p.get("photo"),
+                                caption=f"{p.get('name')} | {p.get('size')}" if len(media) == 0 else ""
+                            )
                         )
+
+                        products_map.append(p)
 
                     except Exception as e:
                         print("BROKEN PRODUCT:", p)
                         print("ERROR:", e)
                         continue
+
+                if not media:
+                    await update.message.reply_text("❌ Mos mahsulot topilmadi")
+                    return
+
+                # 🔥 ALBUM
+                await update.message.reply_media_group(media)
+
+                # 🔽 TUGMALAR
+                for p in products_map:
+                    keyboard = [
+                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")],
+                        [
+                            InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
+                            InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
+                        ]
+                    ]
+
+                    await update.message.reply_text(
+                        f"📦 {p.get('name')} ({p.get('size')})",
+                        reply_markup=InlineKeyboardMarkup(keyboard)
+                    )
+
+                return
+
+
+            # ===== USER =====
+            context.user_data["filter_category"] = category
+
+            media = []
+            products_map = []
+
+            for p in products:
+                try:
+                    if not filter_check(p, context):
+                        continue
+
+                    available = int(p.get("count", 0)) - int(p.get("reserved", 0))
+                    if available <= 0:
+                        continue
+
+                    if len(media) >= 10:
+                        break
+
+                    media.append(
+                        InputMediaPhoto(
+                            media=p.get("photo"),
+                            caption=f"{p.get('name')} | {p.get('size')}" if len(media) == 0 else ""
+                        )
+                    )
+
+                    products_map.append(p)
+
+                except Exception as e:
+                    print("BROKEN PRODUCT:", p)
+                    print("ERROR:", e)
+                    continue
+
+            if not media:
+                await update.message.reply_text("❌ Mos mahsulot topilmadi")
+                context.user_data.clear()
+                return
+
+            # 🔥 ALBUM
+            await update.message.reply_media_group(media)
+
+            # 🔽 TUGMALAR
+            for p in products_map:
+                keyboard = [
+                    [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
+                ]
+
+                await update.message.reply_text(
+                    f"📦 {p.get('name')} ({p.get('size')})",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+
+            context.user_data.clear()
+            return
 
                 if not found:
                     await update.message.reply_text("❌ Mos mahsulot topilmadi")
