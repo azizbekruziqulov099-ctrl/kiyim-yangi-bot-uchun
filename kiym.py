@@ -96,8 +96,6 @@ def get_filter_menu(user_data):
             )
         ],
 
-        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
-
         # 🇹🇷 🏭
         [
             InlineKeyboardButton(
@@ -124,8 +122,6 @@ def get_filter_menu(user_data):
             )
         ],
 
-        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
-
         # 🌸 🍂
         [
             InlineKeyboardButton(
@@ -137,9 +133,6 @@ def get_filter_menu(user_data):
                 callback_data="s_Kuz"
             )
         ],
-
-        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
-
         # ✅ 🔄
         [
             InlineKeyboardButton("✅ Tanlash", callback_data="apply"),
