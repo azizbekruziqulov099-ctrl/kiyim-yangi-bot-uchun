@@ -1090,9 +1090,26 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # 🔥 USER bo‘lsa razmer so‘raydi
             context.user_data["filter_category"] = category
-            context.user_data["step"] = "write_size"
+            found = False
 
-            await update.message.reply_text("📏 Uzunlik yozing (sm)\nMasalan: 40")
+            for p in products:
+                if filter_check(p, context):
+                    found = True
+
+                    keyboard = [
+                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
+                    ]
+
+                    await update.message.reply_photo(
+                        photo=p["photo"],
+                        caption=f"{p['name']}\n📏 {p['size']}\n💰 {p['price']}",
+                        reply_markup=InlineKeyboardMarkup(keyboard)
+                    )
+
+            if not found:
+                await update.message.reply_text("❌ Mahsulot yo‘q")
+
+            context.user_data.clear()
             return
         elif text == "🚚 Buyurtma berish":
             keyboard = [["🚚 Dastavka", "📍 Olib ketish"],["🔙 Orqaga", "🏠 Bosh menyu"]]
