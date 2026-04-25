@@ -1449,6 +1449,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     data = query.data
 
+    # 🔥 SHU YERGA QO‘Y
+    if data in ["next_one", "prev_one"]:
+        if "filtered" not in context.user_data:
+            await query.answer("❌ Avval mahsulot tanlang", show_alert=True)
+            return
+
 # ===== FILTER BLOK =====
     if data.startswith("g_") or data.startswith("o_") or data.startswith("s_"):
 
@@ -1593,51 +1599,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "clear_no":
         await query.message.reply_text("❌ Bekor qilindi")
 
-    elif data == "next_one":
-        context.user_data["i"] += 1
+    # 🔥 SHU IKKALASIGA TEGISHLI QISMINI FAOL QIL
+    elif data in ["next_one", "prev_one"]:
+        p = context.user_data["filtered"][context.user_data["i"]]
 
-        if context.user_data["i"] >= len(context.user_data["filtered"]):
-            context.user_data["i"] = len(context.user_data["filtered"]) - 1
+        keyboard = []
+        nav = []
 
-    elif data == "prev_one":
-        context.user_data["i"] -= 1
+        if context.user_data["i"] > 0:
+            nav.append(InlineKeyboardButton("⬅️", callback_data="prev_one"))
 
-        if context.user_data["i"] < 0:
-            context.user_data["i"] = 0
-    p = context.user_data["filtered"][context.user_data["i"]]
+        if context.user_data["i"] < len(context.user_data["filtered"]) - 1:
+            nav.append(InlineKeyboardButton("➡️", callback_data="next_one"))
 
-    keyboard = []
-    nav = []
+        if nav:
+            keyboard.append(nav)
 
-    if context.user_data["i"] > 0:
-        nav.append(InlineKeyboardButton("⬅️", callback_data="prev_one"))
-
-    if context.user_data["i"] < len(context.user_data["filtered"]) - 1:
-        nav.append(InlineKeyboardButton("➡️", callback_data="next_one"))
-
-    if nav:
-        keyboard.append(nav)
-
-    keyboard.append([
-        InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")
-    ])
-
-    if str(update.effective_user.id) == str(ADMIN_ID):
         keyboard.append([
-            InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
-            InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
+            InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")
         ])
-
-    from telegram import InputMediaPhoto
-
-    await query.message.edit_media(
-        media=InputMediaPhoto(
-            media=p.get("photo"),
-            caption=f"{context.user_data['i']+1}/{len(context.user_data['filtered'])}\n\n"
-                    f"{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}"
-        ),
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
 
     elif data.startswith("plus_"):
         product_id = int(data.split("_")[1])
