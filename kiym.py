@@ -324,6 +324,62 @@ CATEGORIES = [
     "🩲 Ichki kiyim"
 ]
 
+async def show_products(update, context, products, ADMIN_ID):
+
+    page = context.user_data.get("page", 0)
+    start = page * 4
+    end = start + 4
+
+    chunk = products[start:end]
+
+    if not chunk:
+        await update.message.reply_text("❌ Hech narsa topilmadi")
+        return
+
+    # 🔥 ALBUM
+    media = []
+    for i, p in enumerate(chunk):
+        media.append(
+            InputMediaPhoto(
+                media=p.get("photo"),
+                caption=f"{i+1}) {p.get('size')}"
+            )
+        )
+
+    await update.message.reply_media_group(media)
+
+    # 🔽 INFO + TUGMALAR
+    for i, p in enumerate(chunk):
+        keyboard = [
+            [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
+        ]
+
+        if str(update.effective_user.id) == str(ADMIN_ID):
+            keyboard.append([
+                InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
+                InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
+            ])
+
+        await update.message.reply_text(
+            f"{i+1}) {p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    # 🔽 NEXT / PREV
+    nav = []
+
+    if start > 0:
+        nav.append(InlineKeyboardButton("⬅️ Orqaga", callback_data="prev"))
+
+    if end < len(products):
+        nav.append(InlineKeyboardButton("➡️ Keyingi", callback_data="next"))
+
+    if nav:
+        await update.message.reply_text(
+            "📄 Sahifa",
+            reply_markup=InlineKeyboardMarkup([nav])
+        )
+
 async def start_photo_flow(context, chat_id, file_id):
     # 🔥 bu photo_handler ichidagi boshlanish logikasi
     context.user_data.clear()
@@ -1115,13 +1171,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if available <= 0:
                             continue
 
-                        if len(media) >= 10:
+                        if len(media) >= 4
                             break
 
                         media.append(
                             InputMediaPhoto(
                                 media=p.get("photo"),
-                                caption=f"{p.get('name')} | {p.get('size')}" if len(media) == 0 else ""
+                                caption=f"{len(media)+1}) {p.get('size')}" if len(media) == 0 else ""
                             )
                         )
 
@@ -1140,7 +1196,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_media_group(media)
 
                 # 🔽 TUGMALAR
-                for p in products_map:
+                for i, p in enumerate(products_map):
                     keyboard = [
                         [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")],
                         [
@@ -1150,7 +1206,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     ]
 
                     await update.message.reply_text(
-                        f"📦 {p.get('name')} ({p.get('size')})",
+                        f"{i+1}) {p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
                         reply_markup=InlineKeyboardMarkup(keyboard)
                     )
 
@@ -1172,13 +1228,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if available <= 0:
                         continue
 
-                    if len(media) >= 10:
+                    if len(media) >= 4:
                         break
 
                     media.append(
                         InputMediaPhoto(
                             media=p.get("photo"),
-                            caption=f"{p.get('name')} | {p.get('size')}" if len(media) == 0 else ""
+                            caption=f"{len(media)+1}) {p.get('size')}" if len(media) == 0 else ""
                         )
                     )
 
@@ -1197,39 +1253,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 🔥 ALBUM
             await update.message.reply_media_group(media)
 
-            # ===== USER =====
-            context.user_data["filter_category"] = category
-
-            media = []
-            products_map = []
-
-            for p in products:
-                try:
-                    if not filter_check(p, context):
-                        continue
-
-                    available = int(p.get("count", 0)) - int(p.get("reserved", 0))
-                    if available <= 0:
-                        continue
-
-                    if len(media) >= 10:
-                        break
-
-                    media.append(
-                        InputMediaPhoto(
-                            media=p.get("photo"),
-                            caption=f"{p.get('name')} | {p.get('size')}" if len(media) == 0 else ""
-                        )
-                    )
-
-                    products_map.append(p)
-
-                except Exception as e:
-                    print("BROKEN PRODUCT:", p)
-                    print("ERROR:", e)
-                    continue
-
-
+            
             # ❗ AGAR HECH NARSA TOPILMASA
             if not media:
                 await update.message.reply_text("❌ Mos mahsulot topilmadi")
@@ -1242,25 +1266,20 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
             # 🔽 TUGMALAR
-            for p in products_map:
+            for i, p in enumerate(products_map):
                 keyboard = [
                     [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
                 ]
 
                 await update.message.reply_text(
-                    f"📦 {p.get('name')} ({p.get('size')})",
+                    f"{i+1}) {p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
-
 
             context.user_data.clear()
             return            
 
-            if not found:
-                await update.message.reply_text("❌ Mos mahsulot topilmadi")
-
-            context.user_data.clear()
-            return
+         
         elif text == "🚚 Buyurtma berish":
             keyboard = [["🚚 Dastavka", "📍 Olib ketish"],["🔙 Orqaga", "🏠 Bosh menyu"]]
 
@@ -1665,6 +1684,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "clear_no":
         await query.message.reply_text("❌ Bekor qilindi")
+
+    elif data == "next":
+        context.user_data["page"] = context.user_data.get("page", 0) + 1
+        filtered = [p for p in products if filter_check(p, context)]
+        await show_products(update, context, filtered, ADMIN_ID)
+        return
+
+    elif data == "prev":
+        context.user_data["page"] = max(0, context.user_data.get("page", 0) - 1)
+        filtered = [p for p in products if filter_check(p, context)]
+        await show_products(update, context, filtered, ADMIN_ID)
+        return
 
     elif data.startswith("plus_"):
         product_id = int(data.split("_")[1])
