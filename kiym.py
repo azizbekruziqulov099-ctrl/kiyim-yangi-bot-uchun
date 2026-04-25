@@ -1449,6 +1449,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     data = query.data
 
+
 # ===== FILTER BLOK =====
     if data.startswith("g_") or data.startswith("o_") or data.startswith("s_"):
 
@@ -1593,28 +1594,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "clear_no":
         await query.message.reply_text("❌ Bekor qilindi")
 
-        # 🔥 oldinga orqaga
-    if data in ["next_one", "prev_one"]:
+            # 🔥 oldinga orqaga
+    elif data == "next_one" or data == "prev_one":
 
-        if "filtered" not in context.user_data:
-            await query.answer("❌ Avval mahsulot tanlang", show_alert=True)
-            return
-
-        # 🔥 INDEXNI O‘ZGARTIRISH
+        # 🔄 indexni o‘zgartiramiz
         if data == "next_one":
             context.user_data["i"] += 1
-        else:
+            if context.user_data["i"] >= len(context.user_data["filtered"]):
+                context.user_data["i"] = len(context.user_data["filtered"]) - 1
+
+        else:  # prev_one
             context.user_data["i"] -= 1
+            if context.user_data["i"] < 0:
+                context.user_data["i"] = 0
 
-        # 🔒 LIMIT
-        if context.user_data["i"] < 0:
-            context.user_data["i"] = 0
-
-        if context.user_data["i"] >= len(context.user_data["filtered"]):
-            context.user_data["i"] = len(context.user_data["filtered"]) - 1
-
+        # 🔥 MAHSULOTNI OLAMIZ
         p = context.user_data["filtered"][context.user_data["i"]]
 
+        # 🔘 TUGMALAR
         keyboard = []
         nav = []
 
@@ -1628,18 +1625,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append(nav)
 
         keyboard.append([
-            InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")
+            InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")
         ])
 
-        # 🔥 ENG MUHIM
-        await query.message.reply_photo(
-            photo=p["photo"],
-            caption=f"{context.user_data['i']+1}/{len(context.user_data['filtered'])}\n\n"
-                    f"{p['name']}\n📏 {p['size']}\n💰 {p['price']}",
+        if str(update.effective_user.id) == str(ADMIN_ID):
+            keyboard.append([
+                InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
+                InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
+            ])
+
+        from telegram import InputMediaPhoto
+
+        await query.message.edit_media(
+            media=InputMediaPhoto(
+                media=p.get("photo"),
+                caption=f"{context.user_data['i']+1}/{len(context.user_data['filtered'])}\n\n"
+                        f"{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}"
+            ),
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-
-        return
 
     elif data.startswith("plus_"):
         product_id = int(data.split("_")[1])
