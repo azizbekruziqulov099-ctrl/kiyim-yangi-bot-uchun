@@ -1127,7 +1127,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
 
-        # 👕 KATEGORIYA → STOP (FAqat mahsulot chiqadi)
         elif "(" in text and context.user_data.get("step") == "user_category":
 
             category = text.split("(")[0]
@@ -1154,132 +1153,41 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 category = "ichki kiyim"
 
             context.user_data["filter_category"] = category
-            # 🔥 ADMIN bo‘lsa darrov chiqaramiz
 
-            # ===== ADMIN =====
-            if update.effective_user.id == ADMIN_ID:
+            # 🔥 FILTER
+            filtered = [p for p in products if filter_check(p, context)]
 
-                media = []
-                products_map = []
-
-                for p in products:
-                    try:
-                        if not filter_check(p, context):
-                            continue
-
-                        available = int(p.get("count", 0)) - int(p.get("reserved", 0))
-                        if available <= 0:
-                            continue
-
-                        if len(media) >= 2:
-                            break
-
-                        media.append(
-                            InputMediaPhoto(
-                                media=p.get("photo"),
-                                caption=f"{len(media)+1}) {p.get('size')}" if len(media) == 0 else ""
-                            )
-                        )
-
-                        products_map.append(p)
-
-                    except Exception as e:
-                        print("BROKEN PRODUCT:", p)
-                        print("ERROR:", e)
-                        continue
-
-                if not media:
-                    await update.message.reply_text("❌ Mos mahsulot topilmadi")
-                    return
-
-                # 🔥 ALBUM
-                await update.message.reply_media_group(media)
-
-                # 🔽 TUGMALAR
-                for i, p in enumerate(products_map):
-                    keyboard = [
-                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")],
-                        [
-                            InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
-                            InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
-                        ]
-                    ]
-
-                    await update.message.reply_text(
-                        f"{i+1}) {p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-
-                return
-
-
-            # ===== USER =====
-            context.user_data["filter_category"] = category
-
-            media = []
-            products_map = []
-
-            for p in products:
-                try:
-                    if not filter_check(p, context):
-                        continue
-
-                    available = int(p.get("count", 0)) - int(p.get("reserved", 0))
-                    if available <= 0:
-                        continue
-
-                    if len(media) >= 2:
-                        break
-
-                    media.append(
-                        InputMediaPhoto(
-                            media=p.get("photo"),
-                            caption=f"{len(media)+1}) {p.get('size')}" if len(media) == 0 else ""
-                        )
-                    )
-
-                    products_map.append(p)
-
-                except Exception as e:
-                    print("BROKEN PRODUCT:", p)
-                    print("ERROR:", e)
-                    continue
-
-            if not media:
+            if not filtered:
                 await update.message.reply_text("❌ Mos mahsulot topilmadi")
-                context.user_data.clear()
                 return
 
-            # 🔥 ALBUM
-            await update.message.reply_media_group(media)
+            context.user_data["filtered"] = filtered
+            context.user_data["i"] = 0
 
-            
-            # ❗ AGAR HECH NARSA TOPILMASA
-            if not media:
-                await update.message.reply_text("❌ Mos mahsulot topilmadi")
-                context.user_data.clear()
-                return
+            p = filtered[0]
 
+            keyboard = [
+                [
+                    InlineKeyboardButton("⬅️", callback_data="prev_one"),
+                    InlineKeyboardButton("➡️", callback_data="next_one")
+                ],
+                [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
+            ]
 
-            # 🔥 ALBUM (rasmlar blok)
-            await update.message.reply_media_group(media)
+            # 🔥 ADMIN tugmalar
+            if str(update.effective_user.id) == str(ADMIN_ID):
+                keyboard.append([
+                    InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
+                    InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
+                ])
 
+            await update.message.reply_photo(
+                photo=p.get("photo"),
+                caption=f"1/{len(filtered)}\n\n{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
 
-            # 🔽 TUGMALAR
-            for i, p in enumerate(products_map):
-                keyboard = [
-                    [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
-                ]
-
-                await update.message.reply_text(
-                    f"{i+1}) {p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-
-            context.user_data.clear()
-            return            
-
-         
+            return         
         elif text == "🚚 Buyurtma berish":
             keyboard = [["🚚 Dastavka", "📍 Olib ketish"],["🔙 Orqaga", "🏠 Bosh menyu"]]
 
