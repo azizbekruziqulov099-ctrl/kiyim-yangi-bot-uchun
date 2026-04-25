@@ -1171,7 +1171,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if available <= 0:
                             continue
 
-                        if len(media) >= 4:
+                        if len(media) >= 2:
                             break
 
                         media.append(
@@ -1228,7 +1228,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if available <= 0:
                         continue
 
-                    if len(media) >= 4:
+                    if len(media) >= 2:
                         break
 
                     media.append(
