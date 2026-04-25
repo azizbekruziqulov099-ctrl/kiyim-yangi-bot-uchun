@@ -293,7 +293,7 @@ def count_products(context, filter_func=None):
 ADMIN_MENU = ReplyKeyboardMarkup(
     [
         ["📊 Statistika", "📦 Buyurtmalar"],
-        ["➕ Mahsulot qo‘shish", "📢 Reklama"],
+        [ "📢 Reklama"],
         ["🏠 Bosh menyu"]
     ],
     resize_keyboard=True
@@ -303,7 +303,7 @@ MAIN_MENU = ReplyKeyboardMarkup(
     [
         ["🛍 Kiyimlar"],
         ["🔍 Qidirish", "🧺 Savat"],
-        ["ℹ️ Yordam", "📏 Razmer jadvali"]
+        ["ℹ️ Yordam"]
     ],
     resize_keyboard=True
 )
@@ -315,10 +315,10 @@ CART_BUTTON = ["🧺 Savat"]
 CATEGORIES = [
     "👕 2 talik kiyim (dvoyka)",
     "👕 3 talik kiyim (troyka)",
-    "👕 Futbolka",
+    "👕 Futbolka(qizlarga ko‘ylak ham)",
     "👖 Shim",
     "🧥 Qalin kiyim",
-    "🩳 Shortik",
+    "🩳 Shortik(qizlarga yubka)",
     "👟 oyoq kiyim",
     "🧢 Bosh kiyim",
     "🩲 Ichki kiyim"
@@ -346,10 +346,31 @@ async def show_products(update, context, products, ADMIN_ID):
             )
         )
 
-    await update.message.reply_media_group(media)
+    # 🔥 MEDIA YIG‘ISH
+    media = []
+    valid_products = []
+
+    for i, p in enumerate(chunk):
+        if not p.get("photo"):
+            continue  # rasm yo‘q bo‘lsa skip
+
+        media.append(
+            InputMediaPhoto(
+                media=p.get("photo"),
+                caption=f"{i+1}) {p.get('size')}"
+            )
+        )
+        valid_products.append(p)
+
+    # 🔥 ALBUM YUBORISH
+    if media:
+        await update.message.reply_media_group(media)
+    else:
+        await update.message.reply_text("❌ Rasm topilmadi")
+        return
 
     # 🔽 INFO + TUGMALAR
-    for i, p in enumerate(chunk):
+    for i, p in enumerate(valid_products):
         keyboard = [
             [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
         ]
@@ -361,7 +382,7 @@ async def show_products(update, context, products, ADMIN_ID):
             ])
 
         await update.message.reply_text(
-            f"{i+1}) {p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
+            f"{i+1}) {p.get('name')}\n📏 {p.get('size')} sm\n💰 {p.get('price')}",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
@@ -576,48 +597,35 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
 
-        elif text == "🗑 Tozalash":
-            if update.effective_user.id != ADMIN_ID:
-                return
-
-            keyboard = [
-                [InlineKeyboardButton("✅ HA", callback_data="clear_yes")],
-                [InlineKeyboardButton("❌ YO‘Q", callback_data="clear_no")]
-            ]
-
-            await update.message.reply_text(
-                "⚠️ Rostdan ham barcha mahsulotlarni o‘chirmoqchimisiz?",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-
         elif text == "ℹ️ Yordam":
+
+            # 1-QISM
             await update.message.reply_text(
-                "Bolalar uchun kiyim razmerini to‘g‘ri tanlash uchun avvalo bolaning bo‘yini aniqlash kerak: "
-                "bola oyoq kiyimsiz, devorga tik turgan holatda boshiga tekis buyum qo‘yilib belgi qilinadi va poldan shu belgigacha masofa santimetrda o‘lchanadi; "
-                "masalan, agar bola 100 sm chiqsa, jadvaldan 98 yoki 104 razmer tanlanadi.\n\n"
-
-                "Ko‘krak o‘lchami futbolka va ko‘ylaklar uchun olinadi: santimetr lenta ko‘krakning eng keng joyidan aylantirib, siqmasdan va bo‘sh qoldirmasdan o‘lchanadi; "
-                "bel o‘lchami esa shim va shortik uchun kerak bo‘lib, belning tabiiy qismidan aylantirib o‘lchanadi.\n\n"
-
-                "Agar o‘lchash qiyin bo‘lsa, eng oson usul — bolaning hozir yaxshi kelayotgan kiyimini tekis joyga qo‘yib, uzunligi va kengligini o‘lchab, yangi kiyimni shu o‘lchamga yaqin tanlashdir.\n\n"
-
-                "Jadvaldan foydalanishda asosiy mezon — bola bo‘yi: jadvalda berilgan bo‘y oralig‘iga mos razmer tanlanadi va odatda qulaylik uchun 2–4 sm zahira bilan olish tavsiya etiladi.\n\n"
-
-                "Shuni inobatga olish kerakki, barcha o‘lchamlar umumiy standartlarga asoslangan bo‘lib, har bir brend yoki modelga qarab biroz farq qilishi mumkin, "
-                "shuning uchun jadvaldagi qiymatlar yo‘naltiruvchi (taxminiy) hisoblanadi."
+                "📏 1-QISM: Kiyimni qanday o‘lchash\n\n"
+                "Bolaga mos eski kiyimni oling, stolga tekis qo‘ying va yuqoridan pastgacha uzunligini santimetrda o‘lchang. "
+                "Masalan: 44 sm chiqdi. Shu o‘lcham eng muhim, chunki bot aynan shu bo‘yicha ishlaydi.\n\n"
+                "Endi shu raqamni eslab qoling, chunki keyingi qadamda aynan shu orqali qidiruv qilasiz."
             )
-        elif text == "📏 Razmer jadvali":
 
-            images = [
-                "AgACAgIAAxkBAAIglmnX1XJ2Za6zc4Svn1wLmGhE4Q5jAAIkF2sbymy5Su63OueLl84AAQEAAwIAA3kAAzsE",
-                "AgACAgIAAxkBAAIgmGnX14xdrAqXRiMfrRGlq7lTiCkBAAIuF2sbymy5SvTdKaYZnU6_AQADAgADeQADOwQ"
-            ]
+            # 2-QISM
+            await update.message.reply_text(
+                "🔎 2-QISM: Qidirish va tanlash\n\n"
+                "Botga 44 yozsangiz → 43, 44, 45 sm kiyimlar chiqadi. "
+                "Bu sizga yaqin o‘lchamlarni ko‘rsatadi.\n\n"
+                "Kattaroq kerak bo‘lsa → 46 yozing.\n"
+                "Kichikroq kerak bo‘lsa → 42 yozing.\n\n"
+                "Har bir kiyim ostida uzunligi yozilgan bo‘ladi, shu raqamga qarab tanlang."
+            )
 
-            for img in images:
-                await update.message.reply_photo(photo=img)
-
-            await update.message.reply_text("🏠 Bosh menyu", reply_markup=MAIN_MENU)
-            
+            # 3-QISM
+            await update.message.reply_text(
+                "🛒 3-QISM: Buyurtma berish\n\n"
+                "Yoqgan kiyimni tanlab 🛒 Savatga qo‘shing.\n"
+                "🧺 Savat ga kiring.\n"
+                "🚚 Buyurtma berish ni bosing.\n"
+                "Telefon raqamingizni yozing.\n\n"
+                "Shu bilan buyurtma tugaydi va siz bilan bog‘lanishadi."
+            )                   
         elif context.user_data.get("step") == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
             season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
             context.user_data["filter_season"] = season
@@ -697,53 +705,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif text == "🔙 Orqaga":
             step = context.user_data.get("step")
 
-            # 🔹 size_category → size_season
-            if step == "size_category":
-                context.user_data["step"] = "size_season"
-
-                keyboard = [
-                    ["☀️ Yozgi","❄️ Qishki"],
-                    ["🌸 Bahor","🍂 Kuz"],
-                    ["🔙 Orqaga", "🏠 Bosh menyu"]
-                ]
-
-                await update.message.reply_text(
-                    "Fasl tanlang:",
-                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-                )
-
-            # 🔹 size_season → size_filter
-            elif step == "size_season":
-                context.user_data["step"] = "size_filter"
-
-                keyboard = [
-                    ["75-80","80-85","85-90"],
-                    ["90-95","95-100","100-105","105-110"],
-                    ["110-115","115-120","120-125","125-130"],
-                    ["🔙 Orqaga", "🏠 Bosh menyu"]
-                ]
-
-                await update.message.reply_text(
-                    "Razmer tanlang:",
-                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-                )
-
-            # 🔹 size_filter → choose_type
-            elif step == "size_filter":
-                context.user_data["step"] = "choose_type"
-
-                keyboard = [
-                    ["📏 Razmer bo‘yicha", "📦 Barchasi", "📂 Umumiy"],
-                    ["🔙 Orqaga", "🏠 Bosh menyu"]
-                ]
-
-                await update.message.reply_text(
-                    "Qanday qidirasiz?",
-                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-                )
-
+        
             # 🔹 choose_type → gender
-            elif step == "choose_type":
+            if step == "choose_type":
                 context.user_data["step"] = "user_gender"
 
                 keyboard = [
@@ -776,7 +740,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.user_data["step"] = "choose_type"
 
                 keyboard = [
-                    ["📏 Razmer bo‘yicha", "📂 Umumiy"],
+                    ["📂 Umumiy"],
                     ["🔙 Orqaga", "🏠 Bosh menyu"]
                 ]
 
@@ -844,17 +808,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Nomini yozing:")
             return
 
-        elif text == "📦 Barchasi":
-            context.user_data.clear()
-            context.user_data["mode"] = "all"
-            context.user_data["step"] = "all_season"
-
-            keyboard = [["☀️ Yozgi", "❄️ Qishki"], ["🌸 Bahor", "🍂 Kuz"]]
-
-            await update.message.reply_text(
-                "Fasl tanlang:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
         elif context.user_data.get("step") == "all_season":
 
             season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "").strip().lower()
@@ -972,7 +925,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.commit()
             load_products_from_db()
             context.user_data.clear()
-        elif context.user_data.get("step") == "size_filter" and "-" in text:
+        elif context.user_data.get("step") == "size_filter":
             size = text.replace(" ", "")
             context.user_data["filter_size"] = size
             context.user_data["step"] = "size_season"
@@ -1011,21 +964,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Qaysi ishlab chiqarish:",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
-        elif text == "📏 Razmer bo‘yicha":
 
-            context.user_data["step"] = "size_filter"
-
-            keyboard = [
-                ["75-80","80-85","85-90"],
-                ["90-95","95-100","100-105","105-110"],
-                ["110-115","115-120","120-125","125-130"],
-                ["🔙 Orqaga", "🏠 Bosh menyu"]
-            ]
-
-            await update.message.reply_text(
-                "📏 Razmer tanlang:",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            )
         elif text == "📂 Umumiy":
 
             context.user_data["step"] = "user_season"
@@ -1921,11 +1860,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"✅ Buyurtmangiz qabul qilindi!\n\n📞 Tel: {ADMIN_PHONE}\n🏠 Manzil: {ADDRESS}"
         )
 
-        await context.bot.send_location(
-            chat_id=user_id,
-            latitude=LAT,
-            longitude=LON
-        )
+      #  await context.bot.send_location(
+       #     chat_id=user_id,
+        #    latitude=LAT,
+         #   longitude=LON
+        #)
 
         # ADMIN ga
         await context.bot.send_message(
