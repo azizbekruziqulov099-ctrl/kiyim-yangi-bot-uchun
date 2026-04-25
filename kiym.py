@@ -1055,7 +1055,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["step"] = "choose_type"
 
             keyboard = [
-                ["📏 Razmer bo‘yicha", "📂 Umumiy"],
+                ["📂 Umumiy"],
                 ["🔙 Orqaga", "🏠 Bosh menyu"]
             ]
 
