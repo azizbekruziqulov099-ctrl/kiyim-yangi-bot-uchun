@@ -1197,6 +1197,50 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 🔥 ALBUM
             await update.message.reply_media_group(media)
 
+            # ===== USER =====
+            context.user_data["filter_category"] = category
+
+            media = []
+            products_map = []
+
+            for p in products:
+                try:
+                    if not filter_check(p, context):
+                        continue
+
+                    available = int(p.get("count", 0)) - int(p.get("reserved", 0))
+                    if available <= 0:
+                        continue
+
+                    if len(media) >= 10:
+                        break
+
+                    media.append(
+                        InputMediaPhoto(
+                            media=p.get("photo"),
+                            caption=f"{p.get('name')} | {p.get('size')}" if len(media) == 0 else ""
+                        )
+                    )
+
+                    products_map.append(p)
+
+                except Exception as e:
+                    print("BROKEN PRODUCT:", p)
+                    print("ERROR:", e)
+                    continue
+
+
+            # ❗ AGAR HECH NARSA TOPILMASA
+            if not media:
+                await update.message.reply_text("❌ Mos mahsulot topilmadi")
+                context.user_data.clear()
+                return
+
+
+            # 🔥 ALBUM (rasmlar blok)
+            await update.message.reply_media_group(media)
+
+
             # 🔽 TUGMALAR
             for p in products_map:
                 keyboard = [
@@ -1208,49 +1252,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
 
+
             context.user_data.clear()
-            return
-
-                if not found:
-                    await update.message.reply_text("❌ Mos mahsulot topilmadi")
-
-                return
-
-
-            # 🔥 USER bo‘lsa
-            context.user_data["filter_category"] = category
-
-            found = False
-
-            for p in products:
-                try:
-                    if not filter_check(p, context):
-                        continue
-
-                    available = int(p.get("count", 0)) - int(p.get("reserved", 0))
-                    if available <= 0:
-                        continue
-
-                    found = True
-
-                    keyboard = [
-                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
-                    ]
-
-                    name = str(p.get("name", "Noma’lum"))
-                    size = str(p.get("size", "-"))
-                    price = str(p.get("price", "-"))
-
-                    await update.message.reply_photo(
-                        photo=p.get("photo"),
-                        caption=f"{name}\n📏 {size}\n💰 {price}",
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-
-                except Exception as e:
-                    print("BROKEN PRODUCT:", p)
-                    print("ERROR:", e)
-                    continue
+            return            
 
             if not found:
                 await update.message.reply_text("❌ Mos mahsulot topilmadi")
