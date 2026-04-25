@@ -1593,17 +1593,51 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "clear_no":
         await query.message.reply_text("❌ Bekor qilindi")
 
-    elif data == "next":
-        context.user_data["page"] = context.user_data.get("page", 0) + 1
-        filtered = [p for p in products if filter_check(p, context)]
-        await show_products(update, context, filtered, ADMIN_ID)
-        return
+    elif data == "next_one":
+        context.user_data["i"] += 1
 
-    elif data == "prev":
-        context.user_data["page"] = max(0, context.user_data.get("page", 0) - 1)
-        filtered = [p for p in products if filter_check(p, context)]
-        await show_products(update, context, filtered, ADMIN_ID)
-        return
+        if context.user_data["i"] >= len(context.user_data["filtered"]):
+            context.user_data["i"] = len(context.user_data["filtered"]) - 1
+
+    elif data == "prev_one":
+        context.user_data["i"] -= 1
+
+        if context.user_data["i"] < 0:
+            context.user_data["i"] = 0
+    p = context.user_data["filtered"][context.user_data["i"]]
+
+    keyboard = []
+    nav = []
+
+    if context.user_data["i"] > 0:
+        nav.append(InlineKeyboardButton("⬅️", callback_data="prev_one"))
+
+    if context.user_data["i"] < len(context.user_data["filtered"]) - 1:
+        nav.append(InlineKeyboardButton("➡️", callback_data="next_one"))
+
+    if nav:
+        keyboard.append(nav)
+
+    keyboard.append([
+        InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")
+    ])
+
+    if str(update.effective_user.id) == str(ADMIN_ID):
+        keyboard.append([
+            InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
+            InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
+        ])
+
+    from telegram import InputMediaPhoto
+
+    await query.message.edit_media(
+        media=InputMediaPhoto(
+            media=p.get("photo"),
+            caption=f"{context.user_data['i']+1}/{len(context.user_data['filtered'])}\n\n"
+                    f"{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}"
+        ),
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
     elif data.startswith("plus_"):
         product_id = int(data.split("_")[1])
