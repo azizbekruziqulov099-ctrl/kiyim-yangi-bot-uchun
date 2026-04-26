@@ -172,7 +172,7 @@ def filter_check(p, context):
         if o.lower() not in str(p.get("origin", "")).lower():
             return False
 
-    # 🔥 category (tozalangan va tolerant)
+    # 🔥 category (YENGIL VA ISHONCHLI)
     c = context.user_data.get("filter_category")
     if c:
         user_cat = str(c).strip().lower()
@@ -181,21 +181,8 @@ def filter_check(p, context):
         if not prod_cat:
             return False
 
-        # synonymlarni normallashtiramiz
-        def norm(x):
-            x = x.replace("kiyimlar", "kiyim")
-            x = x.replace("  ", " ").strip()
-            return x
-
-        user_cat = norm(user_cat)
-        prod_cat = norm(prod_cat)
-
-        # 🔥 asosiy tekshiruv (aniq + fallback)
-        if user_cat == prod_cat:
-            pass
-        elif user_cat in prod_cat or prod_cat in user_cat:
-            pass
-        else:
+        # 🔥 faqat o‘xshashlikni tekshiramiz (soft)
+        if user_cat not in prod_cat:
             return False
 
     # 🔥 season (TOZA)
