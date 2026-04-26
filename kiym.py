@@ -14,7 +14,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 conn = psycopg2.connect(DATABASE_URL)
 
-
+cur.execute("UPDATE products SET reserved = 0")
+conn.commit()
 cur = conn.cursor()
 cur.execute("""
 CREATE TABLE IF NOT EXISTS products (
