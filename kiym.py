@@ -17,6 +17,7 @@ cur = conn.cursor()   # 🔥 SHU MUHIM
 
 cur.execute("UPDATE products SET reserved = 0")
 conn.commit()
+
 cur = conn.cursor()
 cur.execute("""
 CREATE TABLE IF NOT EXISTS products (
@@ -1186,17 +1187,17 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             for p in products:
 
-                # 🧥 kategoriya
+                # kategoriya
                 if category not in str(p.get("category", "")).lower():
                     continue
 
-                # 🏭 fabrika
+                # origin
                 origin = context.user_data.get("filter_origin")
                 if origin:
                     if origin.lower() not in str(p.get("origin", "")).lower():
                         continue
 
-                # ☀️ fasl
+                # season
                 season = context.user_data.get("filter_season")
                 if season:
                     p_seasons = p.get("season", [])
@@ -1209,18 +1210,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if season.lower() not in p_seasons:
                         continue
 
-                # 📦 mavjudligi (TO‘G‘RI)
+                # mavjudlik
                 available = p.get("count", 0) - p.get("reserved", 0)
                 if available <= 0:
                     continue
 
                 filtered.append(p)
 
-            # 🔥 faqat rasm borlarini qoldiramiz
-            filtered = [p for p in filtered if p.get("photo")]
-
+            # ❗ BU YERDA ENDI FILTERNI TEKSHIRAMIZ
             if not filtered:
-                await update.message.reply_text("❌ Mos mahsulot topilmadi (rasm yo‘q)")
+                await update.message.reply_text("❌ Mos mahsulot topilmadi")
                 return
 
             context.user_data["filtered"] = filtered
@@ -1237,17 +1236,18 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
             ]
 
-            if str(update.effective_user.id) == str(ADMIN_ID):
-                keyboard.append([
-                    InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
-                    InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
-                ])
-
-            await update.message.reply_photo(
-                photo=photo,
-                caption=f"1/{len(filtered)}\n\n{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            # 🔥 RASM BOR/YO‘Q HOLAT
+            if photo:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=f"1/{len(filtered)}\n\n{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                await update.message.reply_text(
+                    f"1/{len(filtered)}\n\n{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}\n\n⚠️ Rasm yo‘q",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
         elif text == "🚚 Buyurtma berish":
             keyboard = [["🚚 Dastavka", "📍 Olib ketish"],["🔙 Orqaga", "🏠 Bosh menyu"]]
 
