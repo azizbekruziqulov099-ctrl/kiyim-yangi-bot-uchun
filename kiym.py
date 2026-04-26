@@ -1097,35 +1097,35 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             filtered = []
 
             for p in products:
-                try:
-                    # ✅ CATEGORY
-                    if category not in str(p.get("category","")).lower():
-                        continue
 
-                    # ✅ FABRIKA (origin)
-                    origin = context.user_data.get("filter_origin")
-                    if origin:
-                        if origin.lower() not in str(p.get("origin","")).lower():
-                            continue
-
-                    # ✅ FASL (season)
-                    season = context.user_data.get("filter_season")
-                    if season:
-                        p_season = str(p.get("season","")).lower()
-
-                        # list yoki string bo‘lishidan qat’i nazar ishlaydi
-                        if season.lower() not in p_season:
-                            continue
-
-                    # ✅ COUNT
-                    if int(p.get("count", 0)) <= 0:
-                        continue
-
-                    filtered.append(p)
-
-                except Exception as e:
-                    print("FILTER ERROR:", e)
+                # 🧥 kategoriya
+                if category not in str(p.get("category", "")).lower():
                     continue
+
+                # 🏭 fabrika
+                origin = context.user_data.get("filter_origin")
+                if origin:
+                    if origin.lower() not in str(p.get("origin", "")).lower():
+                        continue
+
+                # ☀️ fasl
+                season = context.user_data.get("filter_season")
+                if season:
+                    if season.lower() not in str(p.get("season", "")).lower():
+                        continue
+
+                # 📦 mavjudligi
+                if int(p.get("count", 0)) <= 0:
+                    continue
+
+                filtered.append(p)
+            if not filtered:
+                await update.message.reply_text("❌ Mos mahsulot topilmadi")
+                return
+
+            context.user_data["filtered"] = filtered
+            context.user_data["i"] = 0
+            print("FILTERED:", filtered)
 
             if not filtered:
                 await update.message.reply_text("❌ Mos mahsulot topilmadi")
