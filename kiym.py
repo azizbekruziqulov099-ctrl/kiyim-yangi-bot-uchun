@@ -18,6 +18,9 @@ cur = conn.cursor()   # 🔥 SHU MUHIM
 cur.execute("UPDATE products SET reserved = 0")
 conn.commit()
 
+cur.execute("DELETE FROM products WHERE photo IS NULL OR photo = ''")
+conn.commit()
+
 cur = conn.cursor()
 cur.execute("""
 CREATE TABLE IF NOT EXISTS products (
