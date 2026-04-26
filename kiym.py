@@ -229,7 +229,8 @@ def filter_check(p, context):
 
     # 🔥 mavjudlik (Eng ko'p xato shu yerda bo'ladi)
     available = p.get("count", 0) - p.get("reserved", 0)
-    if p.get("count", 0) <= 0:
+
+    if available <= 0:
         return False
 
     # Agar barcha shartlardan o'tsa
@@ -247,7 +248,7 @@ def clean_cart(user_id, context=None):
 
     for pid, item in cart.items():
         if now - item["time"] < 7200:
-            new_cart[int(pid)] = item
+            new_cart[pid] = item
         else:
             p = next((x for x in products if x["id"] == int(pid)), None)
             if p:
@@ -654,7 +655,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not p:
                     continue
 
-                price = int(''.join(filter(str.isdigit, p["price"])))
+                price = int(''.join(filter(str.isdigit, str(p.get("price", 0)))))
                 total += price * qty
 
             final = total + 0
@@ -685,7 +686,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not p:
                     continue
 
-                price = int(''.join(filter(str.isdigit, p["price"])))
+                price = int(''.join(filter(str.isdigit, str(p.get("price", 0)))))
                 total += price * qty
 
             delivery = 0
@@ -824,10 +825,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     p_seasons = [str(s).strip().lower() for s in p_seasons]
 
                     if season in p_seasons:
-                        found = True   # ✅ TO‘G‘RI JOY
+
+                        photo = p.get("photo")
+                        if not photo:
+                            continue
+
+                        found = True
 
                         await update.message.reply_photo(
-                            photo=p.get("photo"),
+                            photo=photo,
                             caption=f"{p.get('name','')}\n📏 {p.get('size','')}\n💰 {p.get('price','')}"
                         )
 
@@ -1017,9 +1023,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not p:
                     continue
 
-                pprice = int(''.join(filter(str.isdigit, p["price"])))
+                price = int(''.join(filter(str.isdigit, str(p.get("price", 0)))))
 
-                summa = pprice * qty
+                summa = price * qty
                 total += summa
 
                 msg += f"{p['name']} x{qty} = {summa}\n"
@@ -1142,6 +1148,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             p = filtered[0]
 
+            photo = p.get("photo")
+
+            if not photo:
+                await update.message.reply_text("❌ Rasm topilmadi")
+                return
+
             keyboard = [
                 [
                     InlineKeyboardButton("⬅️", callback_data="prev_one"),
@@ -1150,7 +1162,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
             ]
 
-            # 🔥 ADMIN tugmalar
             if str(update.effective_user.id) == str(ADMIN_ID):
                 keyboard.append([
                     InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
@@ -1158,12 +1169,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ])
 
             await update.message.reply_photo(
-                photo=p.get("photo"),
+                photo=photo,
                 caption=f"1/{len(filtered)}\n\n{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
-
-            return         
         elif text == "🚚 Buyurtma berish":
             keyboard = [["🚚 Dastavka", "📍 Olib ketish"],["🔙 Orqaga", "🏠 Bosh menyu"]]
 
@@ -1320,7 +1329,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not p:
                     continue
 
-                price = int(''.join(filter(str.isdigit, p["price"])))
+                price = int(''.join(filter(str.isdigit, str(p.get("price", 0)))))
                 total += price * qty
 
             context.user_data["temp_order"] = {
@@ -2007,9 +2016,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             qty = item["qty"]
 
             # 💰 narxni tozalab olish
-            pprice = int(''.join(filter(str.isdigit, p["price"])))
+            price = int(''.join(filter(str.isdigit, str(p.get("price", 0)))))
 
-            summa = pprice * qty
+            summa = price * qty
             total += summa
 
             msg += f"{p['name']} x{qty} = {summa}\n"
@@ -2062,9 +2071,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not p:
                 continue
 
-            pprice = int(''.join(filter(str.isdigit, p["price"])))
+            price = int(''.join(filter(str.isdigit, str(p.get("price", 0)))))
 
-            summa = pprice * qty
+            summa = price * qty
             total += summa
 
             msg += f"{p['name']} x{qty} = {summa}\n"
@@ -2147,9 +2156,9 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not p:
             continue
 
-        pprice = int(''.join(filter(str.isdigit, p["price"])))
+        price = int(''.join(filter(str.isdigit, str(p.get("price", 0)))))
 
-        total += pprice * qty   # ✅ TO‘G‘RI
+        total += price * qty   # ✅ TO‘G‘RI
 
     delivery = 0
     final = total + delivery
