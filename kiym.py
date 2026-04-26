@@ -1111,9 +1111,15 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # ☀️ fasl
                 season = context.user_data.get("filter_season")
                 if season:
-                    if season.lower() not in str(p.get("season", "")).lower():
-                        continue
+                    p_seasons = p.get("season", [])
 
+                    if not isinstance(p_seasons, list):
+                        p_seasons = str(p_seasons).split(",")
+
+                    p_seasons = [s.strip().lower() for s in p_seasons]
+
+                    if season.lower() not in p_seasons:
+                        continue
                 # 📦 mavjudligi
                 if int(p.get("count", 0)) <= 0:
                     continue
