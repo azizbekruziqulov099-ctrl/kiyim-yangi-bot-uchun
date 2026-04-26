@@ -13,6 +13,7 @@ from telegram import InputMediaPhoto
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 conn = psycopg2.connect(DATABASE_URL)
+cur = conn.cursor()   # 🔥 SHU MUHIM
 
 cur.execute("UPDATE products SET reserved = 0")
 conn.commit()
