@@ -172,7 +172,7 @@ def filter_check(p, context):
         if o.lower() not in str(p.get("origin", "")).lower():
             return False
 
-    # 🔥 category
+    # 🔥 category (tozalangan va tolerant)
     c = context.user_data.get("filter_category")
     if c:
         user_cat = str(c).strip().lower()
@@ -181,7 +181,21 @@ def filter_check(p, context):
         if not prod_cat:
             return False
 
-        if user_cat not in prod_cat:   # 👈 SHUNI QO‘Y
+        # synonymlarni normallashtiramiz
+        def norm(x):
+            x = x.replace("kiyimlar", "kiyim")
+            x = x.replace("  ", " ").strip()
+            return x
+
+        user_cat = norm(user_cat)
+        prod_cat = norm(prod_cat)
+
+        # 🔥 asosiy tekshiruv (aniq + fallback)
+        if user_cat == prod_cat:
+            pass
+        elif user_cat in prod_cat or prod_cat in user_cat:
+            pass
+        else:
             return False
 
     # 🔥 season (TOZA)
@@ -228,8 +242,7 @@ def filter_check(p, context):
 
     # 🔥 mavjudlik (Eng ko'p xato shu yerda bo'ladi)
     available = p.get("count", 0) - p.get("reserved", 0)
-    if available <= 0:
-        print(f"DEBUG: {p['name']} - sotuvda qolmagan yoki hammasi rezervda")
+    if p.get("count", 0) <= 0:
         return False
 
     # Agar barcha shartlardan o'tsa
@@ -1340,7 +1353,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             size = text.strip()
 
             if not size.isdigit():
-                await update.message.reply_text("❌ Faqat raqam yozing (44)")
+                await update.message.reply_text("❌ Faqat raqam yozing (masalan 44)")
                 return
 
             context.user_data["filter_size"] = size
@@ -1357,15 +1370,19 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                     await update.message.reply_photo(
                         photo=p["photo"],
-                        caption=f"{p['name']}\n📏 Razmer: {p['size']}\n💰 {p['price']}",
+                        caption=f"{p['name']}\n📏 {p['size']} sm\n💰 {p['price']}",
                         reply_markup=InlineKeyboardMarkup(keyboard)
                     )
 
+            # ❗ AGAR TOPILMASA
             if not found:
-                await update.message.reply_text("❌ Mos mahsulot topilmadi")
+                await update.message.reply_text(
+                    "❌ Mos mahsulot topilmadi.\n\nBoshqa razmer yozing (masalan 42, 46)"
+                )
+                return  # 🔥 MUHIM — step o‘chmaydi
 
+            # 🔥 FAqat topilganda tozalaymiz
             context.user_data.clear()
-
         elif text == "🏠 Bosh menyu":
             context.user_data.clear()
 
