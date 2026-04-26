@@ -14,6 +14,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 conn = psycopg2.connect(DATABASE_URL)
 
+
 cur = conn.cursor()
 cur.execute("""
 CREATE TABLE IF NOT EXISTS products (
@@ -32,6 +33,12 @@ CREATE TABLE IF NOT EXISTS products (
 """)
 
 cur.execute("""
+ALTER TABLE products ADD COLUMN IF NOT EXISTS cost INTEGER DEFAULT 0
+""")
+conn.commit()
+
+
+cur.execute("""
 CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
     user_id BIGINT,
@@ -44,6 +51,11 @@ CREATE TABLE IF NOT EXISTS orders (
 )
 """)
 
+conn.commit()
+
+cur.execute("""
+ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at FLOAT
+""")
 conn.commit()
 
 cur.execute("""
@@ -302,8 +314,8 @@ ADMIN_MENU = ReplyKeyboardMarkup(
 
 MAIN_MENU = ReplyKeyboardMarkup(
     [
-        ["🛍 Kiyimlar"],
-        ["🔍 Qidirish", "🧺 Savat"],
+        ["🔍 Qidirish"],
+        ["🛍 Kiyimlar", "🧺 Savat"],
         ["ℹ️ Yordam"]
     ],
     resize_keyboard=True
@@ -421,10 +433,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
-    cur.execute(
-        "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
-        (user_id,)
-    )
+    cur.execute("""
+    INSERT INTO users (user_id, created_at)
+    VALUES (%s, %s)
+    ON CONFLICT (user_id) DO NOTHING
+    """, (user_id, time.time()))
     conn.commit()
 
     load_products_from_db()
@@ -541,6 +554,28 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif text == "📊 Statistika":
             if update.effective_user.id != ADMIN_ID:
                 return
+            now = time.time()
+
+            day = now - 86400
+            week = now - 604800
+            month = now - 2592000
+            year = now - 31536000
+
+            # 🔥 userlar
+            cur.execute("SELECT COUNT(*) FROM users")
+            total_users = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= %s", (day,))
+            day_users = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= %s", (week,))
+            week_users = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= %s", (month,))
+            month_users = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= %s", (year,))
+            year_users = cur.fetchone()[0]
 
             # 🔥 jami buyurtma
             cur.execute("SELECT COUNT(*) FROM orders")
@@ -549,6 +584,31 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 🔥 jami pul
             cur.execute("SELECT SUM(total) FROM orders")
             total_money = cur.fetchone()[0] or 0
+
+            cur.execute("SELECT cart FROM orders")
+            orders_data = cur.fetchall()
+
+            total_profit = 0
+
+            for row in orders_data:
+                cart = json.loads(row[0])
+
+                for pid, item in cart.items():
+                    qty = item["qty"]
+
+                    p = next((x for x in products if x["id"] == int(pid)), None)
+                    if not p:
+                        continue
+
+                    price = int(''.join(filter(str.isdigit, str(p.get("price", 0)))))
+                    cost = p.get("cost", 0)
+
+                    # 🔥 SHU YERNI QO‘SH (ENG MUHIM)
+                    if cost == 0:
+                        continue
+
+                    profit = (price - cost) * qty
+                    total_profit += profit
 
             # 🔥 bugungi buyurtma
             cur.execute("""
@@ -566,11 +626,19 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await update.message.reply_text(
                 f"📊 STATISTIKA\n\n"
+
+                f"👥 Jami user: {total_users}\n"
+                f"📅 Bugun: {day_users}\n"
+                f"📆 7 kun: {week_users}\n"
+                f"🗓 1 oy: {month_users}\n"
+                f"📈 1 yil: {year_users}\n\n"
+                f"📈 FOYDA: {total_profit}\n\n"
+
                 f"🧾 Jami buyurtma: {total_orders}\n"
                 f"💰 Jami tushum: {total_money}\n\n"
-                f"📅 Bugun:\n"
-                f"📦 Buyurtma: {today_orders}\n"
-                f"💵 Tushum: {today_money}"
+
+                f"📦 Bugun buyurtma: {today_orders}\n"
+                f"💵 Bugun tushum: {today_money}"
             )
 
         elif context.user_data.get("step") == "origin":
@@ -864,7 +932,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["step"] = "price"
 
             await update.message.reply_text("Narxni yozing:")
-            
+                    
         elif context.user_data.get("step") == "price":
             price = text.replace(" ", "").replace("so'm","").replace("soʻm","")
 
@@ -876,11 +944,22 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             price = f"{price:,}".replace(",", " ")
 
             context.user_data["price"] = price + " so‘m"
+            context.user_data["step"] = "cost"
+
+            await update.message.reply_text("💸 Tannarxni yozing (masalan 30000):")
+
+        elif context.user_data.get("step") == "cost":
+            cost = text.replace(" ", "")
+
+            if not cost.isdigit():
+                await update.message.reply_text("❌ Faqat raqam yozing")
+                return
+
+            context.user_data["cost"] = int(cost)
             context.user_data["step"] = "count"
 
             await update.message.reply_text("📦 Nechta bor? (masalan 4):")
 
-    
         elif context.user_data.get("step") == "count":
             if not text.isdigit():
                 await update.message.reply_text("❌ Faqat raqam yozing")
@@ -917,13 +996,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("✅ Tahrirlandi!")
             else:
                 cur.execute("""
-                INSERT INTO products (photo, gender, origin, season, category, name, size, price, count, reserved)
+                INSERT INTO products (photo, gender, origin, season, category, name, size, price, count, reserved,cost)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """, (
                     photo, gender, origin,
                     ",".join(seasons),
                     category, name, size, price, count,
-                    0
+                    0,
+                    context.user_data.get("cost", 0)
                 ))
 
                 await update.message.reply_text("✅ Qo‘shildi!")
