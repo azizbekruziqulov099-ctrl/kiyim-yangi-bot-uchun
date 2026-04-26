@@ -982,6 +982,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name = context.user_data.get("name")
             size = context.user_data.get("size")
             price = context.user_data.get("price")
+            cost = context.user_data.get("cost", 0)
             count = context.user_data.get("count")
 
             if context.user_data.get("mode") == "edit":
@@ -1002,12 +1003,20 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("✅ Tahrirlandi!")
             else:
                 cur.execute("""
-                INSERT INTO products (photo, gender, origin, season, category, name, size, price, count, reserved,cost)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                INSERT INTO products (
+                    photo, gender, origin, season, category, name, size, price, count, reserved, cost
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """, (
-                    photo, gender, origin,
+                    photo,
+                    gender,
+                    origin,
                     ",".join(seasons),
-                    category, name, size, price, count,
+                    category,
+                    name,
+                    size,
+                    price,
+                    count,
                     0,
                     context.user_data.get("cost", 0)
                 ))
