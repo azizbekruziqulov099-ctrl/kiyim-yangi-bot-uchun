@@ -1094,7 +1094,38 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["filter_category"] = category
 
             # 🔥 FILTER
-            filtered = [p for p in products if filter_check(p, context)]
+            filtered = []
+
+            for p in products:
+                try:
+                    # ✅ CATEGORY
+                    if category not in str(p.get("category","")).lower():
+                        continue
+
+                    # ✅ FABRIKA (origin)
+                    origin = context.user_data.get("filter_origin")
+                    if origin:
+                        if origin.lower() not in str(p.get("origin","")).lower():
+                            continue
+
+                    # ✅ FASL (season)
+                    season = context.user_data.get("filter_season")
+                    if season:
+                        p_season = str(p.get("season","")).lower()
+
+                        # list yoki string bo‘lishidan qat’i nazar ishlaydi
+                        if season.lower() not in p_season:
+                            continue
+
+                    # ✅ COUNT
+                    if int(p.get("count", 0)) <= 0:
+                        continue
+
+                    filtered.append(p)
+
+                except Exception as e:
+                    print("FILTER ERROR:", e)
+                    continue
 
             if not filtered:
                 await update.message.reply_text("❌ Mos mahsulot topilmadi")
