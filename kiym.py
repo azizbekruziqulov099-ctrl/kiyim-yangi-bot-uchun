@@ -1126,33 +1126,26 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                     if season.lower() not in p_seasons:
                         continue
-                # 📦 mavjudligi
-                if int(p.get("count", 0)) <= 0:
+
+                # 📦 mavjudligi (TO‘G‘RI)
+                available = p.get("count", 0) - p.get("reserved", 0)
+                if available <= 0:
                     continue
 
                 filtered.append(p)
-            if not filtered:
-                await update.message.reply_text("❌ Mos mahsulot topilmadi")
-                return
 
-            context.user_data["filtered"] = filtered
-            context.user_data["i"] = 0
-            print("FILTERED:", filtered)
+            # 🔥 faqat rasm borlarini qoldiramiz
+            filtered = [p for p in filtered if p.get("photo")]
 
             if not filtered:
-                await update.message.reply_text("❌ Mos mahsulot topilmadi")
+                await update.message.reply_text("❌ Mos mahsulot topilmadi (rasm yo‘q)")
                 return
 
             context.user_data["filtered"] = filtered
             context.user_data["i"] = 0
 
             p = filtered[0]
-
             photo = p.get("photo")
-
-            if not photo:
-                await update.message.reply_text("❌ Rasm topilmadi")
-                return
 
             keyboard = [
                 [
