@@ -713,7 +713,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["order_step"] = "phone"
 
             await update.message.reply_text(
-        "🚚 Dastavka narxi taxminan 20 000 - 50 000 so‘m atrofida bo‘ladi.\n\n📞 Telefon raqamingizni yozing:"
+        "📞 Telefon raqamingizni yozing:"
             )
         elif context.user_data.get("order_step") == "manual_location":
             address = text
@@ -1245,7 +1245,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
             await update.message.reply_text(
-                " Dastavka narxi taxminan 20\,000-50\,000 so‘m atrofida bo‘ladi\n 📍 Lokatsiyangizni yuboring va \n⏳ Iltimos bir oz kuting... yoki lokatsiya ishlamasa pastdagi tugmani bosing:",
+                " Dastavka narxi taxminan 20 000-50 000 so‘m atrofida bo‘ladi\n 📍 Lokatsiyangizni yuboring va \n⏳ Iltimos bir oz kuting... yoki lokatsiya ishlamasa pastdagi tugmani bosing:",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )  
 
@@ -1434,7 +1434,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["step"] = "write_size"
 
             await update.message.reply_text(
-                "📏 Mahsulot uzunligini yozing (sm)\nMasalan: 44\n bu kiyimdagi o‘lcham (razmer) emas maxsulotning uzunligi. Tushunmasangiz yordam bo‘limiga o‘ting bosh menyudan "
+                "📏 Mahsulot uzunligini yozing (sm)\nMasalan: 44\n Bu kiyimdagi o‘lcham (razmer) emas maxsulotning uzunligi. Tushunmasangiz yordam bo‘limiga o‘ting bosh menyudan "
             )
         elif context.user_data.get("step") == "write_size":
 
