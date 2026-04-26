@@ -84,79 +84,47 @@ ORIGINS = [
     "🏭 8-mart fabrika"
 ]
 def get_filter_menu(user_data):
-    g = user_data.get("filter_gender")
-    o = user_data.get("filter_origin")
-    s = user_data.get("filter_season")
+    g = user_data.get("filter_gender", "-")
+    o = user_data.get("filter_origin", "-")
+    s = user_data.get("filter_season", "-")
 
     return InlineKeyboardMarkup([
 
-        # 👦 👧
+        # 🔥 JINS LABEL
+        [InlineKeyboardButton(f"Jins: {g}", callback_data="empty")],
+
         [
-            InlineKeyboardButton(
-                f"👦 O‘g‘il {'✅' if g=='o‘g‘il' else ''}",
-                callback_data="g_o‘g‘il"
-            ),
-            InlineKeyboardButton(
-                f"👧 Qiz {'✅' if g=='qiz' else ''}",
-                callback_data="g_qiz"
-            )
+            InlineKeyboardButton(f"👦 O‘g‘il {'✅' if g=='o‘g‘il' else ''}", callback_data="g_o‘g‘il"),
+            InlineKeyboardButton(f"👧 Qiz {'✅' if g=='qiz' else ''}", callback_data="g_qiz"),
         ],
 
-        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
+        # 🔥 FABRIKA LABEL
+        [InlineKeyboardButton(f"Fabrika: {o}", callback_data="empty")],
 
-        # 🇺🇿 🇨🇳
         [
-            InlineKeyboardButton(
-                f"🇺🇿 Vodiy {'✅' if o=='Vodiy' else ''}",
-                callback_data="o_Vodiy"
-            ),
-            InlineKeyboardButton(
-                f"🇨🇳 Xitoy {'✅' if o=='Xitoy' else ''}",
-                callback_data="o_Xitoy"
-            )
+            InlineKeyboardButton(f"🇺🇿 Vodiy {'✅' if o=='Vodiy' else ''}", callback_data="o_Vodiy"),
+            InlineKeyboardButton(f"🇨🇳 Xitoy {'✅' if o=='Xitoy' else ''}", callback_data="o_Xitoy"),
+        ],
+        [
+            InlineKeyboardButton(f"🇹🇷 Turkiya {'✅' if o=='Turkiya' else ''}", callback_data="o_Turkiya"),
+            InlineKeyboardButton(f"🏭 8-mart {'✅' if o=='8-mart fabrika' else ''}", callback_data="o_8-mart fabrika"),
         ],
 
-        # 🇹🇷 🏭
+        # 🔥 FASL LABEL
+        [InlineKeyboardButton(f"Fasl: {s}", callback_data="empty")],
+
         [
-            InlineKeyboardButton(
-                f"🇹🇷 Turkiya {'✅' if o=='Turkiya' else ''}",
-                callback_data="o_Turkiya"
-            ),
-            InlineKeyboardButton(
-                f"🏭 8-mart {'✅' if o=='8-mart fabrika' else ''}",
-                callback_data="o_8-mart fabrika"
-            )
+            InlineKeyboardButton(f"☀️ Yozgi {'✅' if s=='Yozgi' else ''}", callback_data="s_Yozgi"),
+            InlineKeyboardButton(f"❄️ Qishki {'✅' if s=='Qishki' else ''}", callback_data="s_Qishki"),
+        ],
+        [
+            InlineKeyboardButton(f"🌸 Bahor {'✅' if s=='Bahor' else ''}", callback_data="s_Bahor"),
+            InlineKeyboardButton(f"🍂 Kuz {'✅' if s=='Kuz' else ''}", callback_data="s_Kuz"),
         ],
 
-        [InlineKeyboardButton("ㅤ", callback_data="empty")],  # 🔥 GAP
-
-        # ☀️ ❄️
-        [
-            InlineKeyboardButton(
-                f"☀️ Yozgi {'✅' if s=='Yozgi' else ''}",
-                callback_data="s_Yozgi"
-            ),
-            InlineKeyboardButton(
-                f"❄️ Qishki {'✅' if s=='Qishki' else ''}",
-                callback_data="s_Qishki"
-            )
-        ],
-
-        # 🌸 🍂
-        [
-            InlineKeyboardButton(
-                f"🌸 Bahor {'✅' if s=='Bahor' else ''}",
-                callback_data="s_Bahor"
-            ),
-            InlineKeyboardButton(
-                f"🍂 Kuz {'✅' if s=='Kuz' else ''}",
-                callback_data="s_Kuz"
-            )
-        ],
-        # ✅ 🔄
         [
             InlineKeyboardButton("✅ Tanlash", callback_data="apply"),
-            InlineKeyboardButton("🔄 Tozalash", callback_data="reset")
+            InlineKeyboardButton("🔄 Tozalash", callback_data="reset"),
         ]
     ])
 def get_category_buttons(context):
@@ -394,7 +362,7 @@ async def show_products(update, context, products, ADMIN_ID):
             [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
         ]
 
-        if str(update.effective_user.id) == str(ADMIN_ID):
+        if update.effective_user.id == ADMIN_ID:
             keyboard.append([
                 InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
                 InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
@@ -1277,7 +1245,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
             await update.message.reply_text(
-                "📍 Lokatsiyangizni yuboring va \n⏳ Iltimos bir oz kuting... yoki lokatsiya ishlamasa pastdagi tugmani bosing:",
+                " Dastavka narxi taxminan 20\,000-50\,000 so‘m atrofida bo‘ladi\n 📍 Lokatsiyangizni yuboring va \n⏳ Iltimos bir oz kuting... yoki lokatsiya ishlamasa pastdagi tugmani bosing:",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )  
 
@@ -1466,7 +1434,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["step"] = "write_size"
 
             await update.message.reply_text(
-                "📏 Mahsulot uzunligini yozing (sm)\nMasalan: 44"
+                "📏 Mahsulot uzunligini yozing (sm)\nMasalan: 44\n bu kiyimdagi o‘lcham (razmer) emas maxsulotning uzunligi. Tushunmasangiz yordam bo‘limiga o‘ting bosh menyudan "
             )
         elif context.user_data.get("step") == "write_size":
 
@@ -1704,7 +1672,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")
         ])
 
-        if str(update.effective_user.id) == str(ADMIN_ID):
+        if update.effective_user.id == ADMIN_ID:
             keyboard.append([
                 InlineKeyboardButton("✏️ Edit", callback_data=f"edit_{p.get('id')}"),
                 InlineKeyboardButton("🗑 O‘chirish", callback_data=f"delete_{p.get('id')}")
