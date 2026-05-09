@@ -302,7 +302,7 @@ ADMIN_MENU = ReplyKeyboardMarkup(
 
 MAIN_MENU = ReplyKeyboardMarkup(
     [
-        ["🔍🛍 Kiyimlar qidirish"],
+        ["🔍 🛍 Kiyimlar qidirish"],
         ["🛍 Kiyimlar", "🧺 Savat"],
         ["ℹ️ Yordam"]
     ],
