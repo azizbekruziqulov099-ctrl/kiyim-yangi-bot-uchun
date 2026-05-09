@@ -189,38 +189,52 @@ def filter_check(p, context):
 
     # 🔥 size
     if context.user_data.get("filter_size"):
-        size_text = context.user_data.get("filter_size")
-        if str(size_text).isdigit():
-            size = int(size_text)
-            raw = str(p.get("size") or "").lower().replace("sm", "").strip()
 
-            if raw == "":
-                print(f"DEBUG: {p['name']} - o'lcham bo'sh")
-                return False
+        # 🔥 bosh kiyim va ichki kiyimda razmer tekshirilmaydi
+        cat = str(p.get("category", "")).lower()
 
-            if "-" in raw:
-                parts = raw.split("-")
-                if len(parts) >= 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
-                    s1, s2 = int(parts[0]), int(parts[1])
-                    if not (s1 <= size <= s2):
-                        print(f"DEBUG: {p['name']} - o'lcham diapazonga tushmadi ({s1}-{s2})")
-                        return False
-                else: return False
-            else:
-                if not raw.isdigit(): return False
-                p_size = int(raw)
-                if abs(p_size - size) > 1:
-                    print(f"DEBUG: {p['name']} - o'lcham mos kelmadi (P:{p_size}, U:{size})")
+        if "bosh kiyim" not in cat and "ichki kiyim" not in cat:
+
+            size_text = context.user_data.get("filter_size")
+
+            if str(size_text).isdigit():
+                size = int(size_text)
+                raw = str(p.get("size") or "").lower().replace("sm", "").strip()
+
+                if raw == "":
+                    print(f"DEBUG: {p['name']} - o'lcham bo'sh")
                     return False
 
-    # 🔥 mavjudlik (Eng ko'p xato shu yerda bo'ladi)
+                if "-" in raw:
+                    parts = raw.split("-")
+
+                    if len(parts) >= 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                        s1, s2 = int(parts[0]), int(parts[1])
+
+                        if not (s1 <= size <= s2):
+                            print(f"DEBUG: {p['name']} - o'lcham diapazonga tushmadi ({s1}-{s2})")
+                            return False
+                    else:
+                        return False
+
+                else:
+                    if not raw.isdigit():
+                        return False
+
+                    p_size = int(raw)
+
+                    if abs(p_size - size) > 1:
+                        print(f"DEBUG: {p['name']} - o'lcham mos kelmadi (P:{p_size}, U:{size})")
+                        return False
+
+    # 🔥 mavjudlik
     available = p.get("count", 0) - p.get("reserved", 0)
 
     if available <= 0:
         return False
 
-    # Agar barcha shartlardan o'tsa
-    return True 
+    return True
+
 def clean_cart(user_id, context=None):
     
     now = time.time()
@@ -288,7 +302,7 @@ ADMIN_MENU = ReplyKeyboardMarkup(
 
 MAIN_MENU = ReplyKeyboardMarkup(
     [
-        ["🔍 Qidirish"],
+        ["🔍🛍 Kiyimlar qidirish"],
         ["🛍 Kiyimlar", "🧺 Savat"],
         ["ℹ️ Yordam"]
     ],
@@ -490,7 +504,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             context.user_data.clear()
 
-        elif text == "🔍 Qidirish":
+        elif text == "🔍 🛍 Kiyimlar qidirish":
             context.user_data.clear()
 
             await update.message.reply_text(
@@ -647,12 +661,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "📏 1-QISM: Kiyimni qanday o‘lchash\n\n"
                 "Bolaga mos eski kiyimni oling, stolga tekis qo‘ying va yuqoridan pastgacha uzunligini santimetrda o‘lchang. "
                 "Masalan: 44 sm chiqdi. Shu o‘lcham eng muhim, chunki bot aynan shu bo‘yicha ishlaydi.\n\n"
-                "Endi shu raqamni eslab qoling, chunki keyingi qadamda aynan shu orqali qidiruv qilasiz."
+                "Endi shu raqamni eslab qoling, chunki keyingi qadamda aynan shu orqali 🛍 Kiyimlar qidiruv qilasiz."
             )
 
             # 2-QISM
             await update.message.reply_text(
-                "🔎 2-QISM: Qidirish va tanlash\n\n"
+                "🔎 2-QISM: 🛍 Kiyimlar qidirish va tanlash\n\n"
                 "Botga 44 yozsangiz → 43, 44, 45 sm kiyimlar chiqadi. "
                 "Bu sizga yaqin o‘lchamlarni ko‘rsatadi.\n\n"
                 "Kattaroq kerak bo‘lsa → 46 yozing.\n"
@@ -1129,7 +1143,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
 
             await update.message.reply_text(
-                "Qanday qidirasiz?",
+                "Qanday 🛍 Kiyimlar qidirasiz?",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
             return
