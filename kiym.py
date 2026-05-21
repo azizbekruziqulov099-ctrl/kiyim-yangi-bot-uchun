@@ -15,11 +15,6 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()   # 🔥 SHU MUHIM
 
-cur.execute("UPDATE products SET reserved = 0")
-conn.commit()
-
-cur.execute("DELETE FROM products WHERE photo IS NULL OR photo = ''")
-conn.commit()
 
 cur = conn.cursor()
 cur.execute("""
@@ -37,6 +32,12 @@ CREATE TABLE IF NOT EXISTS products (
     reserved INTEGER DEFAULT 0
 )
 """)
+
+cur.execute("UPDATE products SET reserved = 0")
+conn.commit()
+
+cur.execute("DELETE FROM products WHERE photo IS NULL OR photo = ''")
+conn.commit()
 
 cur.execute("""
 ALTER TABLE products ADD COLUMN IF NOT EXISTS cost INTEGER DEFAULT 0
