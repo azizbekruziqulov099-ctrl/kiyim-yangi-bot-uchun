@@ -60,10 +60,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
 conn.commit()
 
-cur.execute("""
-ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at FLOAT
-""")
-conn.commit()
+
 
 cur.execute("""
 CREATE TABLE IF NOT EXISTS users (
@@ -71,6 +68,12 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """)
 conn.commit()
+
+cur.execute("""
+ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at FLOAT
+""")
+conn.commit()
+
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
