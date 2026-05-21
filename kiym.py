@@ -292,7 +292,7 @@ ADMIN_MENU = ReplyKeyboardMarkup(
 
 MAIN_MENU = ReplyKeyboardMarkup(
     [
-        ["🔍 Qidirish"],
+        ["🔍🛍 Kiyim qidirish"],
         ["🛍 Kiyimlar", "🧺 Savat"],
         ["ℹ️ Yordam"]
     ],
@@ -494,7 +494,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             context.user_data.clear()
 
-        elif text == "🔍 Qidirish":
+        elif text == "🔍🛍 Kiyim qidirish":
             context.user_data.clear()
 
             await update.message.reply_text(
@@ -656,7 +656,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # 2-QISM
             await update.message.reply_text(
-                "🔎 2-QISM: Qidirish va tanlash\n\n"
+                "🔎 2-QISM: 🔍🛍 Kiyim qidirish va tanlash\n\n"
                 "Botga 44 yozsangiz → 43, 44, 45 sm kiyimlar chiqadi. "
                 "Bu sizga yaqin o‘lchamlarni ko‘rsatadi.\n\n"
                 "Kattaroq kerak bo‘lsa → 46 yozing.\n"
