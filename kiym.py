@@ -1,5 +1,7 @@
 import json
 import time
+import io
+import openpyxl
 from telegram import KeyboardButton
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
@@ -14,9 +16,6 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()   # 🔥 SHU MUHIM
-
-
-cur = conn.cursor()
 cur.execute("""
 CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
@@ -37,6 +36,15 @@ cur.execute("UPDATE products SET reserved = 0")
 conn.commit()
 
 cur.execute("DELETE FROM products WHERE photo IS NULL OR photo = ''")
+conn.commit()
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS photos (
+    id SERIAL PRIMARY KEY,
+    file_id TEXT NOT NULL,
+    created_at FLOAT
+)
+""")
 conn.commit()
 
 cur.execute("""
@@ -292,7 +300,7 @@ ADMIN_MENU = ReplyKeyboardMarkup(
 
 MAIN_MENU = ReplyKeyboardMarkup(
     [
-        ["🔍🛍 Kiyim qidirish"],
+        ["🔍 Qidirish"],
         ["🛍 Kiyimlar", "🧺 Savat"],
         ["ℹ️ Yordam"]
     ],
@@ -327,23 +335,13 @@ async def show_products(update, context, products, ADMIN_ID):
         await update.message.reply_text("❌ Hech narsa topilmadi")
         return
 
-    # 🔥 ALBUM
-    media = []
-    for i, p in enumerate(chunk):
-        media.append(
-            InputMediaPhoto(
-                media=p.get("photo"),
-                caption=f"{i+1}) {p.get('size')}"
-            )
-        )
-
-    # 🔥 MEDIA YIG‘ISH
+    # 🔥 MEDIA VA VALID MAHSULOTLAR YIG'ISH
     media = []
     valid_products = []
 
     for i, p in enumerate(chunk):
         if not p.get("photo"):
-            continue  # rasm yo‘q bo‘lsa skip
+            continue  # rasm yo'q bo'lsa skip
 
         media.append(
             InputMediaPhoto(
@@ -433,21 +431,195 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 # RASM QABUL (ADMIN)
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 🔥 admin yoki bot yuborgan rasmni qabul qiladi
-    if update.effective_user.id != ADMIN_ID and not update.message.from_user.is_bot:
+    user_id = update.effective_user.id
+
+    if user_id != ADMIN_ID and not update.message.from_user.is_bot:
         return
 
-    context.user_data.clear()
+    # /get_id rejimi — rasm saqlanib raqam qaytaradi
+    if context.user_data.get("get_id_mode"):
+        file_id = update.message.photo[-1].file_id
+        cur.execute(
+            "INSERT INTO photos (file_id, created_at) VALUES (%s, %s) RETURNING id",
+            (file_id, time.time())
+        )
+        photo_num = cur.fetchone()[0]
+        conn.commit()
+        await update.message.reply_text(
+            f"✅ Rasm saqlandi!\n\n"
+            f"📋 Raqam: <b>#{photo_num}</b>\n\n"
+            f"Excel jadvalga <code>{photo_num}</code> raqamini yozing",
+            parse_mode="HTML"
+        )
+        return
 
+    # Oddiy mahsulot qo'shish rejimi
+    context.user_data.clear()
     context.user_data["photo"] = update.message.photo[-1].file_id
     context.user_data["step"] = "gender"
 
-    keyboard = [["👦 O‘g‘il", "👧 Qiz"]]
+    keyboard = [["👦 O'g'il", "👧 Qiz"]]
     await update.message.reply_text(
         "Kim uchun?",
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
-# HANDLE
+
+
+# /get_id buyrug'i
+async def get_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    context.user_data["get_id_mode"] = True
+    await update.message.reply_text(
+        "📸 Endi rasmlarni ketma-ket yuboring\n"
+        "Har bir rasm uchun raqam qaytaraman (#1, #2, #3...)\n"
+        "Shu raqamni Excel ga yozing.\n\n"
+        "Tugagach /done yuboring.",
+        reply_markup=ReplyKeyboardMarkup([["🏠 Bosh menyu"]], resize_keyboard=True)
+    )
+
+
+# /done buyrug'i
+async def done_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.pop("get_id_mode", None)
+    await update.message.reply_text(
+        "✅ file_id rejimi tugadi.",
+        reply_markup=ADMIN_MENU if update.effective_user.id == ADMIN_ID else MAIN_MENU
+    )
+
+
+# Excel import validatsiya konstantlari
+FASL_OPTIONS = {"yozgi", "qishki", "bahor", "kuz"}
+VALID_CATEGORIES = {
+    "2 talik kiyim", "3 talik kiyim", "futbolka", "shim",
+    "qalin kiyim", "shortik", "oyoq kiyim", "bosh kiyim", "ichki kiyim"
+}
+
+
+async def excel_import_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    doc = update.message.document
+    if not doc or not doc.file_name.endswith(".xlsx"):
+        return
+
+    await update.message.reply_text("⏳ Excel o'qilmoqda...")
+
+    file = await context.bot.get_file(doc.file_id)
+    file_bytes = await file.download_as_bytearray()
+
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes))
+        ws = wb["Mahsulotlar"]
+    except Exception as e:
+        await update.message.reply_text(f"❌ Fayl o'qilmadi: {e}")
+        return
+
+    added = 0
+    errors = []
+
+    for row_num, row in enumerate(ws.iter_rows(min_row=4, values_only=True), start=4):
+        if not row[0] and not row[1]:
+            continue
+        if row[0] and "NAMUNA" in str(row[0]).upper():
+            continue
+
+        photo_raw = str(row[0]).strip() if row[0] else ""
+        name      = str(row[1]).strip() if row[1] else ""
+
+        # Raqam bo'lsa — photos jadvaldan file_id olish
+        if photo_raw.isdigit():
+            cur.execute("SELECT file_id FROM photos WHERE id = %s", (int(photo_raw),))
+            ph_row = cur.fetchone()
+            if not ph_row:
+                errors.append(f"Qator {row_num}: #{photo_raw} raqamli rasm topilmadi")
+                continue
+            photo = ph_row[0]
+        else:
+            photo = photo_raw  # to'g'ridan file_id yozilgan bo'lsa ham ishlaydi
+        gender    = str(row[2]).strip() if row[2] else ""
+        origin    = str(row[3]).strip() if row[3] else ""
+        season    = str(row[4]).strip() if row[4] else ""
+        category  = str(row[5]).strip().lower() if row[5] else ""
+        size      = str(row[6]).strip() if row[6] else ""
+        price_raw = str(row[7]).strip() if row[7] else ""
+        cost_raw  = str(row[8]).strip() if row[8] else "0"
+        count_raw = str(row[9]).strip() if row[9] else ""
+
+        missing = []
+        if not photo_raw: missing.append("photo raqami")
+        if not name:      missing.append("nom")
+        if not gender:    missing.append("jins")
+        if not origin:    missing.append("fabrika")
+        if not season:    missing.append("fasl")
+        if not category:  missing.append("kategoriya")
+        if not size:      missing.append("razmer")
+        if not price_raw: missing.append("narx")
+        if not count_raw: missing.append("soni")
+
+        if missing:
+            errors.append(f"Qator {row_num}: {', '.join(missing)} yetishmaydi")
+            continue
+
+        try:
+            price_int = int("".join(filter(str.isdigit, price_raw)))
+            price_str = f"{price_int:,}".replace(",", " ") + " so'm"
+        except:
+            errors.append(f"Qator {row_num}: narx noto'g'ri ({price_raw})")
+            continue
+
+        try:
+            cost_int = int("".join(filter(str.isdigit, cost_raw))) if cost_raw and cost_raw != "0" else 0
+        except:
+            cost_int = 0
+
+        try:
+            count_int = int("".join(filter(str.isdigit, count_raw)))
+        except:
+            errors.append(f"Qator {row_num}: soni noto'g'ri ({count_raw})")
+            continue
+
+        season_parts = [s.strip().capitalize() for s in season.replace(",", " ").split()]
+        valid_seasons = [s for s in season_parts if s.lower() in FASL_OPTIONS]
+        if not valid_seasons:
+            errors.append(f"Qator {row_num}: fasl noto'g'ri ({season})")
+            continue
+        season_db = ",".join(valid_seasons)
+
+        if category not in VALID_CATEGORIES:
+            errors.append(f"Qator {row_num}: kategoriya noto'g'ri ({category})")
+            continue
+
+        try:
+            cur.execute("""
+                INSERT INTO products
+                    (photo, gender, origin, season, category, name, size, price, count, reserved, cost)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s)
+            """, (
+                photo, gender, origin, season_db,
+                category, name, size, price_str,
+                count_int, cost_int
+            ))
+            added += 1
+        except Exception as e:
+            errors.append(f"Qator {row_num}: DB xato — {e}")
+            conn.rollback()
+            continue
+
+    conn.commit()
+    load_products_from_db()
+
+    msg = f"✅ {added} ta mahsulot qo'shildi!"
+    if errors:
+        err_text = "\n".join(errors[:10])
+        if len(errors) > 10:
+            err_text += f"\n... va yana {len(errors)-10} ta xato"
+        msg += f"\n\n⚠️ Xatolar:\n{err_text}"
+
+    await update.message.reply_text(msg)
+
+
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if not update.message:
@@ -494,7 +666,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             context.user_data.clear()
 
-        elif text == "🔍🛍 Kiyim qidirish":
+        elif text == "🔍 Qidirish":
             context.user_data.clear()
 
             await update.message.reply_text(
@@ -656,7 +828,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # 2-QISM
             await update.message.reply_text(
-                "🔎 2-QISM: 🔍🛍 Kiyim qidirish va tanlash\n\n"
+                "🔎 2-QISM: Qidirish va tanlash\n\n"
                 "Botga 44 yozsangiz → 43, 44, 45 sm kiyimlar chiqadi. "
                 "Bu sizga yaqin o‘lchamlarni ko‘rsatadi.\n\n"
                 "Kattaroq kerak bo‘lsa → 46 yozing.\n"
@@ -1294,7 +1466,12 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if p:
                     p["count"] -= qty
                     p["reserved"] = max(0, p.get("reserved", 0) - qty)
-
+                    # 🔥 DB ga ham yozamiz
+                    cur.execute(
+                        "UPDATE products SET count = count - %s, reserved = GREATEST(0, reserved - %s) WHERE id = %s",
+                        (qty, qty, p["id"])
+                    )
+            conn.commit()
             #save_products()
 
             # ===== USERGA MAHSULOT =====
@@ -2104,14 +2281,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         cart = carts.get(user_id, {})
 
-        if product_id in cart:
-            qty = cart[product_id]["qty"]
+        # 🔥 cart kaliti int yoki str bo'lishi mumkin — ikkalasini tekshiramiz
+        cart_key = product_id if product_id in cart else str(product_id) if str(product_id) in cart else None
+
+        if cart_key is not None:
+            qty = cart[cart_key]["qty"]
 
             p = next((x for x in products if x["id"] == product_id), None)
             if p:
                 p["reserved"] = max(0, p.get("reserved", 0) - qty)
 
-            cart.pop(product_id)
+            cart.pop(cart_key)
 
         await query.answer("❌ O‘chirildi")
 
@@ -2243,157 +2423,327 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if context.user_data.get("order_step") != "phone":
-            return
+    if context.user_data.get("order_step") != "phone":
+        return
 
-        contact = update.message.contact
-        phone = contact.phone_number
+    contact = update.message.contact
+    phone = contact.phone_number
 
-        if not phone.startswith("+"):
-            phone = "+" + phone
+    if not phone.startswith("+"):
+        phone = "+" + phone
 
-        data = context.user_data.get("temp_order")
-        if not data:
-            await update.message.reply_text("❌ Xatolik")
-            return
+    data = context.user_data.get("temp_order")
+    if not data:
+        await update.message.reply_text("❌ Xatolik")
+        return
 
-        user_id = update.effective_user.id
-        cur.execute("""
-        INSERT INTO orders (user_id, cart, location, phone, total, status, time)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
-        RETURNING id
-        """, (
-            user_id,
-            json.dumps(data["cart"]),
-            json.dumps(data["location"]),
-            phone,
-            data["total"],
-            "new",
-            time.time()
-        ))
+    user_id = update.effective_user.id
+    cur.execute("""
+    INSERT INTO orders (user_id, cart, location, phone, total, status, time)
+    VALUES (%s,%s,%s,%s,%s,%s,%s)
+    RETURNING id
+    """, (
+        user_id,
+        json.dumps(data["cart"]),
+        json.dumps(data["location"]),
+        phone,
+        data["total"],
+        "new",
+        time.time()
+    ))
 
-        order_id = str(cur.fetchone()[0])
-        conn.commit()
-        # ===== MAHSULOTNI KAMAYTIRISH =====
-        for pid, item in data["cart"].items():
-            qty = item["qty"]
-            p = next((x for x in products if x["id"] == int(pid)), None)
-            if p:
-                p["count"] -= qty
-                p["reserved"] = max(0, p.get("reserved", 0) - qty)
+    order_id = str(cur.fetchone()[0])
+    conn.commit()
 
-        #save_products()
-# ===== USERGA MAHSULOT =====
-        for pid, item in data["cart"].items():
-            p = next((x for x in products if x["id"] == int(pid)), None)
-            if not p:
-                continue
-            qty = item["qty"]
-
-            await context.bot.send_photo(
-                chat_id=user_id,
-                photo=p["photo"],
-                caption=f"{p['name']}\n📏 Razmer: {p['size']}\n💰 {p['price']} x{qty}"
+    # ===== MAHSULOTNI KAMAYTIRISH =====
+    for pid, item in data["cart"].items():
+        qty = item["qty"]
+        p = next((x for x in products if x["id"] == int(pid)), None)
+        if p:
+            p["count"] -= qty
+            p["reserved"] = max(0, p.get("reserved", 0) - qty)
+            # 🔥 DB ga ham yozamiz
+            cur.execute(
+                "UPDATE products SET count = count - %s, reserved = GREATEST(0, reserved - %s) WHERE id = %s",
+                (qty, qty, p["id"])
             )
+    conn.commit()
 
-        # ===== ADMINGA MAHSULOT =====
-        for pid, item in data["cart"].items():
-            p = next((x for x in products if x["id"] == int(pid)), None)
-            if not p:
-                continue
-            qty = item["qty"]
+    # ===== USERGA MAHSULOT =====
+    for pid, item in data["cart"].items():
+        p = next((x for x in products if x["id"] == int(pid)), None)
+        if not p:
+            continue
+        qty = item["qty"]
 
-            await context.bot.send_photo(
-                chat_id=ADMIN_ID,
-                photo=p["photo"],
-                caption=f"{p['name']}\n📏 Razmer: {p['size']}\n💰 {p['price']} x{qty}"
-            )
-
-        # ===== ADMIN TUGMALAR =====
-        if data.get("type") == "delivery":
-            admin_keyboard = [
-                [InlineKeyboardButton("📞 Aloqa", callback_data=f"contact_{order_id}")],
-                [InlineKeyboardButton("🚚 Buyurtmani jo‘natish", callback_data=f"send_{order_id}")],
-                [InlineKeyboardButton("✅ Yakunlandi", callback_data=f"done_{order_id}")],
-                [InlineKeyboardButton("❌ Bekor", callback_data=f"cancel_{order_id}")]
-            ]
-        else:
-            admin_keyboard = [
-                [InlineKeyboardButton("📞 Aloqa", callback_data=f"contact_{order_id}")],
-                [InlineKeyboardButton("📦 Buyurtmani tasdiqlash", callback_data=f"confirm_{order_id}")],
-                [InlineKeyboardButton("✅ Yakunlandi", callback_data=f"done_{order_id}")],
-                [InlineKeyboardButton("❌ Bekor", callback_data=f"cancel_{order_id}")]
-            ]
-
-        # ===== TEXT =====
-        if data.get("type") == "delivery":
-
-            if data.get("location") and "lat" in data["location"]:
-                lat = data["location"]["lat"]
-                lon = data["location"]["lon"]
-                loc = f"\n📍 https://maps.google.com/?q={lat},{lon}"
-            else:
-                loc = "\n📍 Lokatsiya yuborilmadi"
-
-            text_admin = (
-                f"🚚 DASTAVKA\n"
-                f"📞 {phone}\n"
-                f"💰 {data['total']}{loc}"
-            )
-
-            # USER GA STATUS
-            await update.message.reply_text(
-                        "🚚 Buyurtma qabul qilindi!\n📞 Admin siz bilan tez orada bog‘lanadi.",
-                        reply_markup=MAIN_MENU
-            )
-
-        else:
-            text_admin = (
-                f"📍 OLIB KETISH\n"
-                f"📞 {phone}\n"
-                f"💰 {data['total']}\n"
-                f"🏠 Samarqand, Pastdarg‘om, Charxin\n"
-                        )
-
-            # USER GA MANZIL
-            await update.message.reply_text(
-                "📍 Olib ketish manzili:\nSamarqand, Pastdarg‘om, Charxin\n A'loqa 📞 +998915388499  Adminlar o'zlari a'loqaga chiqishadi va manzilni yetgazishadi. " 
-                
-            )
-
-            #await context.bot.send_location(
-             #   chat_id=user_id,
-              #  latitude=39.690149,
-               # longitude=66.824828
-            #)
-
-            await update.message.reply_text(
-                "🏠 Bosh menyu",
-                reply_markup=MAIN_MENU
-            )
-
-        # 🔥 ENG MUHIM — ADMIN GA HAR DOIM YUBORILADI
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=text_admin,
-            reply_markup=InlineKeyboardMarkup(admin_keyboard)
-        )
-        # ADMINGA
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=f"📦 Pickup tayyor\nID: {order_id}"
+        await context.bot.send_photo(
+            chat_id=user_id,
+            photo=p["photo"],
+            caption=f"{p['name']}\n📏 Razmer: {p['size']}\n💰 {p['price']} x{qty}"
         )
 
-       # await query.answer("Tasdiqlandi")
+    # ===== ADMINGA MAHSULOT =====
+    for pid, item in data["cart"].items():
+        p = next((x for x in products if x["id"] == int(pid)), None)
+        if not p:
+            continue
+        qty = item["qty"]
+
+        await context.bot.send_photo(
+            chat_id=ADMIN_ID,
+            photo=p["photo"],
+            caption=f"{p['name']}\n📏 Razmer: {p['size']}\n💰 {p['price']} x{qty}"
+        )
+
+    # ===== ADMIN TUGMALAR =====
+    if data.get("type") == "delivery":
+        admin_keyboard = [
+            [InlineKeyboardButton("📞 Aloqa", callback_data=f"contact_{order_id}")],
+            [InlineKeyboardButton("🚚 Buyurtmani jo'natish", callback_data=f"send_{order_id}")],
+            [InlineKeyboardButton("✅ Yakunlandi", callback_data=f"done_{order_id}")],
+            [InlineKeyboardButton("❌ Bekor", callback_data=f"cancel_{order_id}")]
+        ]
+    else:
+        admin_keyboard = [
+            [InlineKeyboardButton("📞 Aloqa", callback_data=f"contact_{order_id}")],
+            [InlineKeyboardButton("📦 Buyurtmani tasdiqlash", callback_data=f"confirm_{order_id}")],
+            [InlineKeyboardButton("✅ Yakunlandi", callback_data=f"done_{order_id}")],
+            [InlineKeyboardButton("❌ Bekor", callback_data=f"cancel_{order_id}")]
+        ]
+
+    # ===== TEXT =====
+    if data.get("type") == "delivery":
+        if data.get("location") and "lat" in data["location"]:
+            lat = data["location"]["lat"]
+            lon = data["location"]["lon"]
+            loc = f"\n📍 https://maps.google.com/?q={lat},{lon}"
+        else:
+            loc = "\n📍 Lokatsiya yuborilmadi"
+
+        text_admin = (
+            f"🚚 DASTAVKA\n"
+            f"📞 {phone}\n"
+            f"💰 {data['total']}{loc}"
+        )
+
+        await update.message.reply_text(
+            "🚚 Buyurtma qabul qilindi!\n📞 Admin siz bilan tez orada bog'lanadi.",
+            reply_markup=MAIN_MENU
+        )
+    else:
+        text_admin = (
+            f"📍 OLIB KETISH\n"
+            f"📞 {phone}\n"
+            f"💰 {data['total']}\n"
+            f"🏠 Samarqand, Pastdarg'om, Charxin\n"
+        )
+
+        await update.message.reply_text(
+            "📍 Olib ketish manzili:\nSamarqand, Pastdarg'om, Charxin\n A'loqa 📞 +998915388499  Adminlar o'zlari a'loqaga chiqishadi va manzilni yetgazishadi. "
+        )
+
+        await update.message.reply_text(
+            "🏠 Bosh menyu",
+            reply_markup=MAIN_MENU
+        )
+
+    # 🔥 ENG MUHIM — ADMIN GA HAR DOIM YUBORILADI
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=text_admin,
+        reply_markup=InlineKeyboardMarkup(admin_keyboard)
+    )
+
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=f"📦 Pickup tayyor\nID: {order_id}"
+    )
+
     # ===== TOZALASH =====
-        carts[user_id] = {}
-        context.user_data.clear()
+    carts[user_id] = {}
+    context.user_data.clear()
 
 # Application'ni qurishda quyidagi tartibda qo'shing:
 
+
+
+# ─────────────────────────────────────────────
+# SHABLON GENERATSIYA (openpyxl)
+# ─────────────────────────────────────────────
+def generate_shablon_bytes() -> bytes:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
+    import io as _io
+
+    wb = Workbook()
+
+    # ── Yashirin ro'yxatlar varag'i ──
+    ref_ws = wb.active
+    ref_ws.title = "Royxatlar"
+    lists = {
+        "A": ("Jins",       ["O'g'il", "Qiz"]),
+        "B": ("Fabrika",    ["Vodiy", "Xitoy", "Turkiya", "8-mart fabrika"]),
+        "C": ("Fasl",       ["Yozgi", "Qishki", "Bahor", "Kuz"]),
+        "D": ("Kategoriya", [
+            "2 talik kiyim", "3 talik kiyim", "futbolka",
+            "shim", "qalin kiyim", "shortik",
+            "oyoq kiyim", "bosh kiyim", "ichki kiyim"
+        ]),
+    }
+    for col, (header, values) in lists.items():
+        ref_ws[f"{col}1"] = header
+        ref_ws[f"{col}1"].font = Font(bold=True)
+        for i, v in enumerate(values, start=2):
+            ref_ws[f"{col}{i}"] = v
+    ref_ws.sheet_state = "hidden"
+
+    # ── Asosiy varaq ──
+    ws = wb.create_sheet("Mahsulotlar", 0)
+
+    HEADER_BG = "1F4E79"
+    REQD_BG   = "D6E4F0"
+    OPT_BG    = "EBF5FB"
+    EXAMPLE_BG= "FFF9C4"
+    thin   = Side(style="thin", color="AAAAAA")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    COLS = [
+        ("photo (file_id)",     38, True,  "/get_id → rasmni yuboring → kodni shu yerga"),
+        ("Nomi",                22, True,  "Masalan: Bolalar kostyumi"),
+        ("Jins",                12, True,  "Royxatdan tanlang"),
+        ("Fabrika",             18, True,  "Royxatdan tanlang"),
+        ("Fasl",                16, True,  "Royxatdan tanlang. Bir nechta: Yozgi,Bahor"),
+        ("Kategoriya",          20, True,  "Royxatdan tanlang"),
+        ("Razmer (sm)",         14, True,  "Santimetrda: 44 yoki 86-92"),
+        ("Narx (so'm)",        16, True,  "Faqat raqam: 85000"),
+        ("Tannarx (so'm)",     16, False, "Foyda hisoblash uchun: 60000"),
+        ("Soni",                10, True,  "Nechta mavjud: 4"),
+        ("Ranglar (ixtiyoriy)", 28, False, "Oq:4,Qora:3,Ko'k:2"),
+        ("Izoh",                30, False, "Qo'shimcha ma'lumot"),
+    ]
+
+    ws.row_dimensions[1].height = 20
+    ws.row_dimensions[2].height = 40
+    ws.row_dimensions[3].height = 34
+
+    for ci, (title, width, required, note) in enumerate(COLS, start=1):
+        col_l = get_column_letter(ci)
+
+        c = ws.cell(row=1, column=ci, value=title)
+        c.font = Font(bold=True, color="FFFFFF", size=11, name="Arial")
+        c.fill = PatternFill("solid", start_color=HEADER_BG)
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = border
+
+        n = ws.cell(row=2, column=ci, value=note)
+        n.font = Font(italic=True, color="555555", size=9, name="Arial")
+        n.fill = PatternFill("solid", start_color="F0F0F0")
+        n.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        n.border = border
+
+        ws.column_dimensions[col_l].width = width
+
+    examples = [
+        "1", "Bolalar sport kostyumi",
+        "O'g'il", "Xitoy", "Yozgi", "2 talik kiyim",
+        "86-92", "85000", "60000", "4", "Oq:2,Ko'k:2", "Engil material",
+    ]
+    ws.cell(row=3, column=1).value = "NAMUNA — bu qatorni o'chiring"
+    ws.cell(row=3, column=1).font = Font(bold=True, color="B8860B", name="Arial")
+    for ci, val in enumerate(examples, start=1):
+        c = ws.cell(row=3, column=ci)
+        if ci > 1:
+            c.value = val
+        c.fill = PatternFill("solid", start_color=EXAMPLE_BG)
+        c.alignment = Alignment(horizontal="left", vertical="center")
+        c.border = border
+        c.font = Font(italic=True, color="666666", size=10, name="Arial")
+
+    for row in range(4, 104):
+        for ci, (_, _, required, _) in enumerate(COLS, start=1):
+            c = ws.cell(row=row, column=ci)
+            c.fill = PatternFill("solid", start_color=REQD_BG if required else OPT_BG)
+            c.alignment = Alignment(horizontal="left", vertical="center")
+            c.border = border
+            c.font = Font(name="Arial", size=10)
+
+    # Dropdownlar
+    dv_jins = DataValidation(type="list", formula1="=Royxatlar!$A$2:$A$3", allow_blank=True, showDropDown=False)
+    dv_jins.sqref = "C4:C103"
+    ws.add_data_validation(dv_jins)
+
+    dv_fab = DataValidation(type="list", formula1="=Royxatlar!$B$2:$B$5", allow_blank=True, showDropDown=False)
+    dv_fab.sqref = "D4:D103"
+    ws.add_data_validation(dv_fab)
+
+    dv_kat = DataValidation(type="list", formula1="=Royxatlar!$D$2:$D$10", allow_blank=True, showDropDown=False)
+    dv_kat.sqref = "F4:F103"
+    ws.add_data_validation(dv_kat)
+
+    dv_num = DataValidation(type="whole", operator="greaterThan", formula1="0", allow_blank=True)
+    dv_num.sqref = "H4:J103"
+    ws.add_data_validation(dv_num)
+
+    ws.freeze_panes = "A4"
+
+    # Yoriqnoma varag'i
+    yw = wb.create_sheet("Yoriqnoma")
+    yw.column_dimensions["A"].width = 5
+    yw.column_dimensions["B"].width = 24
+    yw.column_dimensions["C"].width = 55
+    yw.merge_cells("A1:C1")
+    h = yw.cell(row=1, column=1, value="Kiym bot — Excel shablon yo'riqnomasi")
+    h.font = Font(bold=True, size=14, color="1F4E79", name="Arial")
+
+    steps = [
+        ("📸", "1. Rasm kodi olish",   "Botga /get_id → rasmlarni yuboring → file_id larni kopiyalang"),
+        ("📋", "2. Jadvalni to'ldiring","Har bir mahsulot = 1 qator. NAMUNA qatorini o'chiring"),
+        ("📁", "3. .xlsx saqlang",      "Fayl → Saqlash → xlsx formatda"),
+        ("📤", "4. Botga yuboring",     "Excel faylni botga yuboring → avtomatik DB ga yoziladi"),
+        ("🎨", "Ranglar ustuni",        "Ixtiyoriy. Format: Oq:4,Qora:3,Ko'k:2"),
+        ("📏", "Razmer ustuni",         "44  yoki  86-92  yoki  3-4 yosh"),
+        ("🌸", "Fasl bir nechta bo'lsa","Vergul bilan: Yozgi,Bahor"),
+    ]
+    for i, (icon, title, desc) in enumerate(steps, start=3):
+        yw.cell(row=i, column=1, value=icon).font = Font(size=13)
+        t = yw.cell(row=i, column=2, value=title)
+        t.font = Font(bold=True, size=11, name="Arial", color="1F4E79")
+        d = yw.cell(row=i, column=3, value=desc)
+        d.font = Font(size=10, name="Arial")
+        d.alignment = Alignment(wrap_text=True)
+        yw.row_dimensions[i].height = 28
+
+    buf = _io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+async def shablon_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    await update.message.reply_text("⏳ Shablon tayyorlanmoqda...")
+    data = generate_shablon_bytes()
+    await update.message.reply_document(
+        document=data,
+        filename="kiym_shablon.xlsx",
+        caption=(
+            "📋 Excel shablon\n\n"
+            "1️⃣ /get_id → rasmlarni yuboring → file_id larni oling\n"
+            "2️⃣ Shu faylni to'ldiring (dropdown lar bor)\n"
+            "3️⃣ NAMUNA qatorini o'chiring\n"
+            "4️⃣ Faylni menga yuboring → DB ga yozaman"
+        )
+    )
+
 app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))   # 🔥 1-o‘rinda
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))  # 🔥 MUHIM
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("get_id", get_id_command))
+app.add_handler(CommandHandler("done", done_command))
+app.add_handler(CommandHandler("shablon", shablon_command))
+app.add_handler(MessageHandler(filters.Document.ALL, excel_import_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 app.add_handler(MessageHandler(filters.PHOTO, photo_handler))
 app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
 app.add_handler(MessageHandler(filters.LOCATION, location_handler))
