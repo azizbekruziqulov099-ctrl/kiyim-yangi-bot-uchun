@@ -3271,59 +3271,74 @@ def generate_shablon_bytes() -> bytes:
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     COLS = [
-        ("Rasm raqami",  14, True,  "Rasmni /get_id bilan yuklang, raqamini yozing"),
-        ("Nomi",         22, True,  "Masalan: Bolalar sport kostyumi"),
-        ("Jins",         12, True,  "▼ Royxatdan tanlang"),
-        ("Fabrika",      16, True,  "▼ Royxatdan tanlang"),
-        ("Fasl",         14, True,  "▼ Royxatdan tanlang"),
-        ("Kategoriya",   22, True,  "▼ Royxatdan tanlang"),
-        ("Razmer (sm)",  13, True,  "Masalan: 44 yoki 86-92"),
-        ("Narx (so'm)", 14, True,  "Faqat raqam: 85000"),
-        ("Tannarx",      13, False, "Foyda hisobi: 60000"),
-        ("Soni",         8,  True,  "Nechta: 4"),
-        ("Ranglar",      20, False, "Ixtiyoriy: Oq:2,Qora:2"),
-        ("Izoh",         24, False, "Qo'shimcha"),
+        ("Rasm\nraqami", 10, True),
+        ("Nomi",           22, True),
+        ("Jins",           12, True),
+        ("Fabrika",        16, True),
+        ("Fasl",           14, True),
+        ("Kategoriya",     22, True),
+        ("Razmer\n(sm)",  10, True),
+        ("Narx\n(so'm)", 12, True),
+        ("Tannarx",        12, False),
+        ("Soni",           8,  True),
+        ("Ranglar",        18, False),
+        ("Izoh",           20, False),
+    ]
+
+    QIYMATLAR = [
+        "Raqam (1, 2, 3...)",
+        "Istalgan nom",
+        "O'g'il  |  Qiz",
+        "Vodiy  |  Xitoy  |  Turkiya  |  8-mart fabrika",
+        "Yozgi  |  Qishki  |  Bahor  |  Kuz",
+        "2 talik kiyim  |  3 talik kiyim  |  futbolka  |  shim  |  qalin kiyim  |  shortik  |  oyoq kiyim  |  bosh kiyim  |  ichki kiyim",
+        "44  yoki  86-92",
+        "Raqam: 85000",
+        "Raqam: 60000",
+        "Raqam: 4",
+        "Oq:2,Qora:3",
+        "Istalgan matn",
     ]
 
     NAMUNA = ["1", "Bolalar kostyumi", "O'g'il", "Xitoy",
               "Yozgi", "2 talik kiyim", "86-92", "85000", "60000", "4", "Oq:2", ""]
 
-    ws.row_dimensions[1].height = 22
-    ws.row_dimensions[2].height = 36
-    ws.row_dimensions[3].height = 30
+    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[2].height = 45
+    ws.row_dimensions[3].height = 20
 
-    for ci, (title, width, req, note) in enumerate(COLS, 1):
+    for ci, (title, width, req) in enumerate(COLS, 1):
         L = get_column_letter(ci)
         ws.column_dimensions[L].width = width
 
         c = ws.cell(row=1, column=ci, value=title)
-        c.font = Font(bold=True, color="FFFFFF", size=11)
+        c.font = Font(bold=True, color="FFFFFF", size=10)
         c.fill = PatternFill("solid", start_color="1F4E79")
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         c.border = border
 
-        n = ws.cell(row=2, column=ci, value=note)
-        n.font = Font(italic=True, color="555555", size=9)
-        n.fill = PatternFill("solid", start_color="EFEFEF")
+        n = ws.cell(row=2, column=ci, value=QIYMATLAR[ci-1])
+        n.font = Font(italic=True, color="1F4E79", size=8, bold=True)
+        n.fill = PatternFill("solid", start_color="DEEAF1")
         n.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
         n.border = border
 
         ex = ws.cell(row=3, column=ci, value=NAMUNA[ci-1])
-        ex.font = Font(italic=True, color="888888", size=10)
-        ex.fill = PatternFill("solid", start_color="FFF9C4")
+        ex.font = Font(italic=True, color="7B6000", size=10)
+        ex.fill = PatternFill("solid", start_color="FFF2CC")
         ex.border = border
+        ex.alignment = Alignment(vertical="center")
 
         for row in range(4, 104):
             cell = ws.cell(row=row, column=ci)
-            cell.fill = PatternFill("solid", start_color="D6E4F0" if req else "EBF5FB")
+            cell.fill = PatternFill("solid", start_color="D9E1F2" if req else "EBF5FB")
             cell.border = border
             cell.font = Font(size=10)
             cell.alignment = Alignment(vertical="center")
 
-    ws.cell(row=3, column=1).value = "NAMUNA — bu qatorni o'chiring"
-    ws.cell(row=3, column=1).font = Font(bold=True, color="B8860B", size=9)
+    ws.cell(row=3, column=1).value = "NAMUNA — o'chiring"
+    ws.cell(row=3, column=1).font = Font(bold=True, color="7B6000", size=9)
 
-    # Dropdownlar — qiymatlar to'g'ridan formula ichida
     ws.add_data_validation(DataValidation(
         type="list", formula1='"O\'g\'il,Qiz"',
         allow_blank=True, showDropDown=False, sqref="C4:C103"))
@@ -3337,7 +3352,8 @@ def generate_shablon_bytes() -> bytes:
         allow_blank=True, showDropDown=False, sqref="E4:E103"))
 
     ws.add_data_validation(DataValidation(
-        type="list", formula1='"2 talik kiyim,3 talik kiyim,futbolka,shim,qalin kiyim,shortik,oyoq kiyim,bosh kiyim,ichki kiyim"',
+        type="list",
+        formula1='"2 talik kiyim,3 talik kiyim,futbolka,shim,qalin kiyim,shortik,oyoq kiyim,bosh kiyim,ichki kiyim"',
         allow_blank=True, showDropDown=False, sqref="F4:F103"))
 
     ws.add_data_validation(DataValidation(
