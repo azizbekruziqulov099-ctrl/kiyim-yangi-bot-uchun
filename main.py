@@ -3264,151 +3264,87 @@ def generate_shablon_bytes() -> bytes:
     import io as _io
 
     wb = Workbook()
+    ws = wb.active
+    ws.title = "Mahsulotlar"
 
-    # ── Yashirin ro'yxatlar varag'i ──
-    ref_ws = wb.active
-    ref_ws.title = "Malumotlar"
-    lists = {
-        "A": ("Jins",       ["O'g'il", "Qiz"]),
-        "B": ("Fabrika",    ["Vodiy", "Xitoy", "Turkiya", "8-mart fabrika"]),
-        "C": ("Fasl",       ["Yozgi", "Qishki", "Bahor", "Kuz"]),
-        "D": ("Kategoriya", [
-            "2 talik kiyim", "3 talik kiyim", "futbolka",
-            "shim", "qalin kiyim", "shortik",
-            "oyoq kiyim", "bosh kiyim", "ichki kiyim"
-        ]),
-    }
-    for col, (header, values) in lists.items():
-        ref_ws[f"{col}1"] = header
-        ref_ws[f"{col}1"].font = Font(bold=True)
-        for i, v in enumerate(values, start=2):
-            ref_ws[f"{col}{i}"] = v
-    ref_ws.sheet_state = "hidden"
-
-    # ── Asosiy varaq ──
-    ws = wb.create_sheet("Mahsulotlar", 0)
-
-    HEADER_BG = "1F4E79"
-    REQD_BG   = "D6E4F0"
-    OPT_BG    = "EBF5FB"
-    EXAMPLE_BG= "FFF9C4"
-    thin   = Side(style="thin", color="AAAAAA")
+    thin = Side(style="thin", color="BBBBBB")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     COLS = [
-        ("photo (file_id)",     38, True,  "/get_id → rasmni yuboring → kodni shu yerga"),
-        ("Nomi",                22, True,  "Masalan: Bolalar kostyumi"),
-        ("Jins",                12, True,  "Royxatdan tanlang"),
-        ("Fabrika",             18, True,  "Royxatdan tanlang"),
-        ("Fasl",                16, True,  "Royxatdan tanlang. Bir nechta: Yozgi,Bahor"),
-        ("Kategoriya",          20, True,  "Royxatdan tanlang"),
-        ("Razmer (sm)",         14, True,  "Santimetrda: 44 yoki 86-92"),
-        ("Narx (so'm)",        16, True,  "Faqat raqam: 85000"),
-        ("Tannarx (so'm)",     16, False, "Foyda hisoblash uchun: 60000"),
-        ("Soni",                10, True,  "Nechta mavjud: 4"),
-        ("Ranglar (ixtiyoriy)", 28, False, "Oq:4,Qora:3,Ko'k:2"),
-        ("Izoh",                30, False, "Qo'shimcha ma'lumot"),
+        ("Rasm raqami",  14, True,  "Rasmni /get_id bilan yuklang, raqamini yozing"),
+        ("Nomi",         22, True,  "Masalan: Bolalar sport kostyumi"),
+        ("Jins",         12, True,  "▼ Royxatdan tanlang"),
+        ("Fabrika",      16, True,  "▼ Royxatdan tanlang"),
+        ("Fasl",         14, True,  "▼ Royxatdan tanlang"),
+        ("Kategoriya",   22, True,  "▼ Royxatdan tanlang"),
+        ("Razmer (sm)",  13, True,  "Masalan: 44 yoki 86-92"),
+        ("Narx (so'm)", 14, True,  "Faqat raqam: 85000"),
+        ("Tannarx",      13, False, "Foyda hisobi: 60000"),
+        ("Soni",         8,  True,  "Nechta: 4"),
+        ("Ranglar",      20, False, "Ixtiyoriy: Oq:2,Qora:2"),
+        ("Izoh",         24, False, "Qo'shimcha"),
     ]
 
-    ws.row_dimensions[1].height = 20
-    ws.row_dimensions[2].height = 40
-    ws.row_dimensions[3].height = 34
+    NAMUNA = ["1", "Bolalar kostyumi", "O'g'il", "Xitoy",
+              "Yozgi", "2 talik kiyim", "86-92", "85000", "60000", "4", "Oq:2", ""]
 
-    for ci, (title, width, required, note) in enumerate(COLS, start=1):
-        col_l = get_column_letter(ci)
+    ws.row_dimensions[1].height = 22
+    ws.row_dimensions[2].height = 36
+    ws.row_dimensions[3].height = 30
+
+    for ci, (title, width, req, note) in enumerate(COLS, 1):
+        L = get_column_letter(ci)
+        ws.column_dimensions[L].width = width
 
         c = ws.cell(row=1, column=ci, value=title)
-        c.font = Font(bold=True, color="FFFFFF", size=11, name="Arial")
-        c.fill = PatternFill("solid", start_color=HEADER_BG)
+        c.font = Font(bold=True, color="FFFFFF", size=11)
+        c.fill = PatternFill("solid", start_color="1F4E79")
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         c.border = border
 
         n = ws.cell(row=2, column=ci, value=note)
-        n.font = Font(italic=True, color="555555", size=9, name="Arial")
-        n.fill = PatternFill("solid", start_color="F0F0F0")
+        n.font = Font(italic=True, color="555555", size=9)
+        n.fill = PatternFill("solid", start_color="EFEFEF")
         n.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
         n.border = border
 
-        ws.column_dimensions[col_l].width = width
+        ex = ws.cell(row=3, column=ci, value=NAMUNA[ci-1])
+        ex.font = Font(italic=True, color="888888", size=10)
+        ex.fill = PatternFill("solid", start_color="FFF9C4")
+        ex.border = border
 
-    examples = [
-        "1", "Bolalar sport kostyumi",
-        "O'g'il", "Xitoy", "Yozgi", "2 talik kiyim",
-        "86-92", "85000", "60000", "4", "Oq:2,Ko'k:2", "Engil material",
-    ]
+        for row in range(4, 104):
+            cell = ws.cell(row=row, column=ci)
+            cell.fill = PatternFill("solid", start_color="D6E4F0" if req else "EBF5FB")
+            cell.border = border
+            cell.font = Font(size=10)
+            cell.alignment = Alignment(vertical="center")
+
     ws.cell(row=3, column=1).value = "NAMUNA — bu qatorni o'chiring"
-    ws.cell(row=3, column=1).font = Font(bold=True, color="B8860B", name="Arial")
-    for ci, val in enumerate(examples, start=1):
-        c = ws.cell(row=3, column=ci)
-        if ci > 1:
-            c.value = val
-        c.fill = PatternFill("solid", start_color=EXAMPLE_BG)
-        c.alignment = Alignment(horizontal="left", vertical="center")
-        c.border = border
-        c.font = Font(italic=True, color="666666", size=10, name="Arial")
+    ws.cell(row=3, column=1).font = Font(bold=True, color="B8860B", size=9)
 
-    for row in range(4, 104):
-        for ci, (_, _, required, _) in enumerate(COLS, start=1):
-            c = ws.cell(row=row, column=ci)
-            c.fill = PatternFill("solid", start_color=REQD_BG if required else OPT_BG)
-            c.alignment = Alignment(horizontal="left", vertical="center")
-            c.border = border
-            c.font = Font(name="Arial", size=10)
+    # Dropdownlar — qiymatlar to'g'ridan formula ichida
+    ws.add_data_validation(DataValidation(
+        type="list", formula1='"O\'g\'il,Qiz"',
+        allow_blank=True, showDropDown=False, sqref="C4:C103"))
 
-    # Dropdownlar
-    # Jins dropdown (C ustun)
-    dv_jins = DataValidation(type="list", formula1="Malumotlar!$A$2:$A$3", allow_blank=True, showDropDown=False)
-    dv_jins.sqref = "C4:C103"
-    ws.add_data_validation(dv_jins)
+    ws.add_data_validation(DataValidation(
+        type="list", formula1='"Vodiy,Xitoy,Turkiya,8-mart fabrika"',
+        allow_blank=True, showDropDown=False, sqref="D4:D103"))
 
-    # Fabrika dropdown (D ustun)
-    dv_fab = DataValidation(type="list", formula1="Malumotlar!$B$2:$B$5", allow_blank=True, showDropDown=False)
-    dv_fab.sqref = "D4:D103"
-    ws.add_data_validation(dv_fab)
+    ws.add_data_validation(DataValidation(
+        type="list", formula1='"Yozgi,Qishki,Bahor,Kuz"',
+        allow_blank=True, showDropDown=False, sqref="E4:E103"))
 
-    # Fasl dropdown (E ustun)
-    dv_fasl = DataValidation(type="list", formula1="Malumotlar!$C$2:$C$5", allow_blank=True, showDropDown=False)
-    dv_fasl.sqref = "E4:E103"
-    ws.add_data_validation(dv_fasl)
+    ws.add_data_validation(DataValidation(
+        type="list", formula1='"2 talik kiyim,3 talik kiyim,futbolka,shim,qalin kiyim,shortik,oyoq kiyim,bosh kiyim,ichki kiyim"',
+        allow_blank=True, showDropDown=False, sqref="F4:F103"))
 
-    # Kategoriya dropdown (F ustun)
-    dv_kat = DataValidation(type="list", formula1="Malumotlar!$D$2:$D$10", allow_blank=True, showDropDown=False)
-    dv_kat.sqref = "F4:F103"
-    ws.add_data_validation(dv_kat)
-
-    # Narx va soni — faqat raqam
-    dv_num = DataValidation(type="whole", operator="greaterThan", formula1="0", allow_blank=True)
-    dv_num.sqref = "H4:J103"
-    ws.add_data_validation(dv_num)
+    ws.add_data_validation(DataValidation(
+        type="whole", operator="greaterThan", formula1="0",
+        allow_blank=True, sqref="H4:J103"))
 
     ws.freeze_panes = "A4"
-
-    # Yoriqnoma varag'i
-    yw = wb.create_sheet("Yoriqnoma")
-    yw.column_dimensions["A"].width = 5
-    yw.column_dimensions["B"].width = 24
-    yw.column_dimensions["C"].width = 55
-    yw.merge_cells("A1:C1")
-    h = yw.cell(row=1, column=1, value="Kiym bot — Excel shablon yo'riqnomasi")
-    h.font = Font(bold=True, size=14, color="1F4E79", name="Arial")
-
-    steps = [
-        ("📸", "1. Rasm kodi olish",   "Botga /get_id → rasmlarni yuboring → file_id larni kopiyalang"),
-        ("📋", "2. Jadvalni to'ldiring","Har bir mahsulot = 1 qator. NAMUNA qatorini o'chiring"),
-        ("📁", "3. .xlsx saqlang",      "Fayl → Saqlash → xlsx formatda"),
-        ("📤", "4. Botga yuboring",     "Excel faylni botga yuboring → avtomatik DB ga yoziladi"),
-        ("🎨", "Ranglar ustuni",        "Ixtiyoriy. Format: Oq:4,Qora:3,Ko'k:2"),
-        ("📏", "Razmer ustuni",         "44  yoki  86-92  yoki  3-4 yosh"),
-        ("🌸", "Fasl bir nechta bo'lsa","Vergul bilan: Yozgi,Bahor"),
-    ]
-    for i, (icon, title, desc) in enumerate(steps, start=3):
-        yw.cell(row=i, column=1, value=icon).font = Font(size=13)
-        t = yw.cell(row=i, column=2, value=title)
-        t.font = Font(bold=True, size=11, name="Arial", color="1F4E79")
-        d = yw.cell(row=i, column=3, value=desc)
-        d.font = Font(size=10, name="Arial")
-        d.alignment = Alignment(wrap_text=True)
-        yw.row_dimensions[i].height = 28
 
     buf = _io.BytesIO()
     wb.save(buf)
