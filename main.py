@@ -3267,7 +3267,7 @@ def generate_shablon_bytes() -> bytes:
 
     # ── Yashirin ro'yxatlar varag'i ──
     ref_ws = wb.active
-    ref_ws.title = "Royxatlar"
+    ref_ws.title = "Malumotlar"
     lists = {
         "A": ("Jins",       ["O'g'il", "Qiz"]),
         "B": ("Fabrika",    ["Vodiy", "Xitoy", "Turkiya", "8-mart fabrika"]),
@@ -3356,18 +3356,27 @@ def generate_shablon_bytes() -> bytes:
             c.font = Font(name="Arial", size=10)
 
     # Dropdownlar
-    dv_jins = DataValidation(type="list", formula1="=Royxatlar!$A$2:$A$3", allow_blank=True, showDropDown=False)
+    # Jins dropdown (C ustun)
+    dv_jins = DataValidation(type="list", formula1="Malumotlar!$A$2:$A$3", allow_blank=True, showDropDown=False)
     dv_jins.sqref = "C4:C103"
     ws.add_data_validation(dv_jins)
 
-    dv_fab = DataValidation(type="list", formula1="=Royxatlar!$B$2:$B$5", allow_blank=True, showDropDown=False)
+    # Fabrika dropdown (D ustun)
+    dv_fab = DataValidation(type="list", formula1="Malumotlar!$B$2:$B$5", allow_blank=True, showDropDown=False)
     dv_fab.sqref = "D4:D103"
     ws.add_data_validation(dv_fab)
 
-    dv_kat = DataValidation(type="list", formula1="=Royxatlar!$D$2:$D$10", allow_blank=True, showDropDown=False)
+    # Fasl dropdown (E ustun)
+    dv_fasl = DataValidation(type="list", formula1="Malumotlar!$C$2:$C$5", allow_blank=True, showDropDown=False)
+    dv_fasl.sqref = "E4:E103"
+    ws.add_data_validation(dv_fasl)
+
+    # Kategoriya dropdown (F ustun)
+    dv_kat = DataValidation(type="list", formula1="Malumotlar!$D$2:$D$10", allow_blank=True, showDropDown=False)
     dv_kat.sqref = "F4:F103"
     ws.add_data_validation(dv_kat)
 
+    # Narx va soni — faqat raqam
     dv_num = DataValidation(type="whole", operator="greaterThan", formula1="0", allow_blank=True)
     dv_num.sqref = "H4:J103"
     ws.add_data_validation(dv_num)
