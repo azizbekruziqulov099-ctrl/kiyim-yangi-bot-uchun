@@ -1611,16 +1611,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif context.user_data.get("step") == "origin_select":
             origin = text.replace("🇺🇿 ", "").replace("🇨🇳 ", "").replace("🇹🇷 ", "").replace("🏭 ", "")
             context.user_data["filter_origin"] = origin
-
-            context.user_data["step"] = "choose_type"
+            context.user_data["step"] = "user_season"
 
             keyboard = [
-                ["📂 Umumiy"],
+                ["☀️ Yozgi", "❄️ Qishki"],
+                ["🌸 Bahor", "🍂 Kuz"],
                 ["🔙 Orqaga", "🏠 Bosh menyu"]
             ]
 
             await update.message.reply_text(
-                "Qanday qidirasiz?",
+                "Fasl tanlang:",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
             return
