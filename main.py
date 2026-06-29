@@ -789,16 +789,26 @@ async def excel_import_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             continue
 
         try:
-            cur.execute("""
-                INSERT INTO shop_products
-                    (photo, gender, origin, season, category, name, size, price, count, reserved, cost)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s)
-            """, (
-                photo, gender, origin, season_db,
-                category, name, size, price_str,
-                count_int, cost_int
-            ))
-            added += 1
+            # Razmerlar vergul bilan bo'lsa — bir xil razmerlar guruhlash
+            razmers = [r.strip() for r in size.split(",") if r.strip()]
+            if not razmers:
+                razmers = [size]
+
+            # Bir xil razmerlarni guruhlash: {razmer: soni}
+            from collections import Counter
+            razmer_counts = Counter(razmers)
+
+            for razmer, cnt in razmer_counts.items():
+                cur.execute("""
+                    INSERT INTO shop_products
+                        (photo, gender, origin, season, category, name, size, price, count, reserved, cost)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s)
+                """, (
+                    photo, gender, origin, season_db,
+                    category, name, razmer, price_str,
+                    cnt, cost_int
+                ))
+                added += 1
         except Exception as e:
             errors.append(f"Qator {row_num}: DB xato — {e}")
             conn.rollback()
