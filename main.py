@@ -138,6 +138,9 @@ def admin_main_kb():
             InlineKeyboardButton("📸 Rasm yuklash", callback_data="adm_photo"),
             InlineKeyboardButton("📋 Shablon",      callback_data="adm_shablon"),
         ],
+        [
+            InlineKeyboardButton("❓ Javobsiz savollar", callback_data="adm_pending_q_0"),
+        ],
     ])
 
 def admin_products_kb():
@@ -445,14 +448,15 @@ def load_products_from_db():
             "reserved": r[10]
         })
 async def send_voice_bytes(text: str):
-    """Matnni ovoz baytlariga aylantiradi (gTTS, ayol ovozi - rus tilida yaqinroq talaffuz)"""
-    from gtts import gTTS
+    """Matnni ovoz baytlariga aylantiradi (edge-tts, Malika — o'zbekcha ayol ovozi)"""
+    import edge_tts
     import tempfile
 
-    tts = gTTS(text=text, lang='ru')
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-        tts.save(f.name)
         path = f.name
+
+    communicate = edge_tts.Communicate(text, voice="uz-UZ-MadinaNeural")
+    await communicate.save(path)
 
     with open(path, "rb") as audio:
         data = audio.read()
@@ -2611,6 +2615,46 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             f"✍️ Savol:\n{question_text}\n\nJavobingizni yozing:"
         )
+        return
+
+    if data.startswith("adm_pending_q_"):
+        page = int(data.replace("adm_pending_q_", ""))
+        offset = page * 5
+
+        cur.execute(
+            "SELECT id, question FROM shop_pending_questions WHERE status='pending' ORDER BY id DESC LIMIT 5 OFFSET %s",
+            (offset,)
+        )
+        rows = cur.fetchall()
+        cur.execute("SELECT COUNT(*) FROM shop_pending_questions WHERE status='pending'")
+        total = cur.fetchone()[0]
+
+        if not rows:
+            await query.message.edit_text(
+                "✅ Javobsiz savollar yo'q!",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")]
+                ])
+            )
+            return
+
+        kb = []
+        text = f"❓ Javobsiz savollar ({total} ta):\n\n"
+        for q_id, question in rows:
+            short_q = question[:40] + ("..." if len(question) > 40 else "")
+            text += f"🆔{q_id}: {short_q}\n"
+            kb.append([InlineKeyboardButton(f"✍️ #{q_id} javob berish", callback_data=f"answer_q_{q_id}")])
+
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton("⬅️", callback_data=f"adm_pending_q_{page-1}"))
+        if offset + 5 < total:
+            nav.append(InlineKeyboardButton("➡️", callback_data=f"adm_pending_q_{page+1}"))
+        if nav:
+            kb.append(nav)
+        kb.append([InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")])
+
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
         return
 
 
