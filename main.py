@@ -83,6 +83,21 @@ CREATE TABLE IF NOT EXISTS shop_pending_questions (
 conn.commit()
 
 cur.execute("""
+CREATE TABLE IF NOT EXISTS shop_sold_products (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER,
+    name TEXT,
+    size TEXT,
+    price TEXT,
+    qty INTEGER,
+    user_id BIGINT,
+    order_id INTEGER,
+    sold_at FLOAT
+)
+""")
+conn.commit()
+
+cur.execute("""
 ALTER TABLE shop_products ADD COLUMN IF NOT EXISTS cost INTEGER DEFAULT 0
 """)
 conn.commit()
@@ -141,6 +156,9 @@ def admin_main_kb():
         [
             InlineKeyboardButton("❓ Javobsiz savollar", callback_data="adm_pending_q_0"),
             InlineKeyboardButton("✅ Javob berilganlar", callback_data="adm_answered_q_0"),
+        ],
+        [
+            InlineKeyboardButton("💰 Sotilganlar", callback_data="adm_sold_0"),
         ],
     ])
 
@@ -700,42 +718,41 @@ def extract_height_from_text(text: str):
 
 
 async def send_products_album(bot, chat_id, matched_products, title=""):
-    """Topilgan mahsulotlarni rasm albomi + to'liq ma'lumot va tugmalar bilan yuboradi"""
+    """Topilgan mahsulotlarni har birini rasm + to'liq ma'lumot + tugma bilan yuboradi"""
     if not matched_products:
         return
 
     if title:
         await bot.send_message(chat_id=chat_id, text=title)
 
-    # Faqat rasmi bor mahsulotlarni olamiz, 10 tadan ko'p bo'lmasin (Telegram albom cheklovi)
-    with_photo = [p for p in matched_products if p.get("photo")][:10]
+    # 10 tadan ko'p bo'lmasin (spam bo'lmasligi uchun)
+    shown = matched_products[:10]
 
-    if with_photo:
-        media = []
-        for i, p in enumerate(with_photo):
-            caption = f"{i+1}) {p['size']}sm"
-            media.append(InputMediaPhoto(media=p["photo"], caption=caption))
+    for i, p in enumerate(shown):
+        caption = f"{i+1}) {p['name']}\n📏 {p['size']} sm\n💰 {p['price']}"
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🛒 Savatga qo'shish", callback_data=f"add_{p['id']}")
+        ]])
         try:
-            await bot.send_media_group(chat_id=chat_id, media=media)
+            if p.get("photo"):
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=p["photo"],
+                    caption=caption,
+                    reply_markup=keyboard
+                )
+            else:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=caption + "\n\n⚠️ Rasm yo'q",
+                    reply_markup=keyboard
+                )
         except Exception as e:
-            print("Album xato:", e)
+            print("Mahsulot yuborish xato:", e)
 
-    # Har biriga to'liq ma'lumot + "Savatga qo'shish" tugmasi
-    for i, p in enumerate(with_photo):
-        try:
-            await bot.send_message(
-                chat_id=chat_id,
-                text=f"{i+1}) {p['name']}\n📏 {p['size']} sm\n💰 {p['price']}",
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🛒 Savatga qo'shish", callback_data=f"add_{p['id']}")
-                ]])
-            )
-        except Exception as e:
-            print("Tugma xato:", e)
-
-    if len(matched_products) > len(with_photo):
-        remaining = len(matched_products) - len(with_photo)
-        await bot.send_message(chat_id=chat_id, text=f"...va yana {remaining} ta rasmsiz mahsulot bor")
+    if len(matched_products) > len(shown):
+        remaining = len(matched_products) - len(shown)
+        await bot.send_message(chat_id=chat_id, text=f"...va yana {remaining} ta mahsulot bor")
 
 
 async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> tuple:
@@ -1000,19 +1017,33 @@ async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> t
         else:
             return (f"❌ {size_num} sm razmerda hozircha mahsulot yo'q.", True, None)
 
-    # Jins bo'yicha
+    # Jins bo'yicha (aniq razmer/yosh/bo'y aytilmagan bo'lsa — so'raymiz)
     if fuzzy_contains(q, ["qiz", "qizlar", "qizga", "qizlarga"]):
         matches = [p for p in available_products if "qiz" in norm(p.get("gender"))]
         if matches:
-            text = f"👧 Qizlar uchun {len(matches)} ta mahsulot topildi, rasmlarini yubormoqdaman:"
-            return (text, True, matches)
+            return (
+                "👧 Albatta! Qizlar uchun kiyimlarimiz bor.\n\n"
+                "Aniqroq taklif berish uchun ayting:\n"
+                "📏 Bolangizning yoshi nechada? (masalan: \"3 yosh\")\n"
+                "yoki\n"
+                "📐 Bo'yi qancha? (masalan: \"bo'yi 95 sm\")",
+                True,
+                None
+            )
         return ("❌ Hozircha qizlar uchun mahsulot yo'q.", True, None)
 
     if fuzzy_contains(q, ["ogil", "ogillar", "bola", "bolalar"]):
         matches = [p for p in available_products if "ogil" in norm(p.get("gender"))]
         if matches:
-            text = f"👦 O'g'il bolalar uchun {len(matches)} ta mahsulot topildi, rasmlarini yubormoqdaman:"
-            return (text, True, matches)
+            return (
+                "👦 Albatta! O'g'il bolalar uchun kiyimlarimiz bor.\n\n"
+                "Aniqroq taklif berish uchun ayting:\n"
+                "📏 Bolangizning yoshi nechada? (masalan: \"3 yosh\")\n"
+                "yoki\n"
+                "📐 Bo'yi qancha? (masalan: \"bo'yi 95 sm\")",
+                True,
+                None
+            )
         return ("❌ Hozircha o'g'il bolalar uchun mahsulot yo'q.", True, None)
 
     # Fabrika bo'yicha
@@ -2957,7 +2988,58 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
         return
 
-    if data.startswith("edit_answer_"):
+    if data.startswith("adm_sold_"):
+        page = int(data.replace("adm_sold_", ""))
+        offset = page * 8
+
+        cur.execute(
+            """
+            SELECT name, size, price, qty, user_id, sold_at
+            FROM shop_sold_products
+            ORDER BY sold_at DESC LIMIT 8 OFFSET %s
+            """,
+            (offset,)
+        )
+        rows = cur.fetchall()
+        cur.execute("SELECT COUNT(*) FROM shop_sold_products")
+        total = cur.fetchone()[0]
+        cur.execute("SELECT SUM(qty) FROM shop_sold_products")
+        total_qty = cur.fetchone()[0] or 0
+
+        if not rows:
+            await query.message.edit_text(
+                "📭 Hali hech narsa sotilmagan.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")]
+                ])
+            )
+            return
+
+        from datetime import datetime as _dt
+        text = f"💰 Sotilgan mahsulotlar\n({total} ta yozuv, jami {total_qty} dona)\n\n"
+        for name, size, price, qty, uid, sold_at in rows:
+            dt = _dt.fromtimestamp(sold_at).strftime("%d.%m.%Y %H:%M")
+            text += (
+                f"📦 {name} ({size}sm)\n"
+                f"💵 {price} x{qty}\n"
+                f"👤 User: {uid}\n"
+                f"📅 {dt}\n\n"
+            )
+
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton("⬅️", callback_data=f"adm_sold_{page-1}"))
+        if offset + 8 < total:
+            nav.append(InlineKeyboardButton("➡️", callback_data=f"adm_sold_{page+1}"))
+        kb = []
+        if nav:
+            kb.append(nav)
+        kb.append([InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")])
+
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
+        return
+
+
         q_id = int(data.replace("edit_answer_", ""))
         cur.execute("SELECT question FROM shop_pending_questions WHERE id=%s", (q_id,))
         row = cur.fetchone()
@@ -3446,16 +3528,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 🔥 ENG MUHIM — RESERVE
             product["reserved"] = product.get("reserved", 0) + 1
 
-        await query.answer("✅ Savatga qo‘shildi")
+        cart_qty = carts[user_id][product_id]["qty"]
 
-        keyboard = [
-            [InlineKeyboardButton("🧺 Savatga o‘tish", callback_data="go_cart")]
-        ]
+        await query.answer(f"✅ Savatga qo'shildi ({cart_qty} ta)")
 
-        await query.message.reply_text(
-            "🛒 Mahsulot vaqtincha siz uchun band qilindi!\n⏳ 2 soat ichida xarid qilmasangiz o‘chiriladi.",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        # Asl xabar tugmasini yangilaymiz — "Savatga qo'shish" o'rniga "Savatga o'tish"
+        try:
+            new_keyboard = [[
+                InlineKeyboardButton(f"🧺 Savatga o'tish ({cart_qty} ta)", callback_data="go_cart")
+            ]]
+            await query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(new_keyboard))
+        except Exception:
+            pass
 
     elif data.startswith("edit_"):
         product_id = int(data.split("_")[1])
@@ -3633,16 +3717,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("done_"):
         order_id = data.split("_")[1]
-        cur.execute("SELECT user_id FROM shop_orders WHERE id=%s", (order_id,))
+        cur.execute("SELECT user_id, cart, total FROM shop_orders WHERE id=%s", (order_id,))
         row = cur.fetchone()
 
         if not row:
             return
 
-        user_id = row[0]
+        order_user_id, cart_json, total = row
+
+        # 🔥 Sotilgan mahsulotlarni "sotilganlar" jadvaliga yozamiz
+        try:
+            cart = json.loads(cart_json)
+            for pid, item in cart.items():
+                qty = item["qty"]
+                p = next((x for x in products if x["id"] == int(pid)), None)
+                if p:
+                    cur.execute("""
+                        INSERT INTO shop_sold_products
+                            (product_id, name, size, price, qty, user_id, order_id, sold_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        p["id"], p["name"], p["size"], p["price"],
+                        qty, order_user_id, order_id, time.time()
+                    ))
+            conn.commit()
+        except Exception as e:
+            print("Sotilganlarga yozish xato:", e)
 
         await context.bot.send_message(
-            chat_id=user_id,
+            chat_id=order_user_id,
             text="✅ Buyurtmangizni qabul qilib oldingiz. Rahmat 😊"
         )
 
@@ -3653,7 +3756,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         cur.execute("DELETE FROM shop_orders WHERE id=%s", (order_id,))
         conn.commit()
-       # save_orders()
 
         await query.answer("Yakunlandi")
 
