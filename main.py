@@ -62,6 +62,27 @@ CREATE TABLE IF NOT EXISTS shop_photos (
 conn.commit()
 
 cur.execute("""
+CREATE TABLE IF NOT EXISTS shop_learned_answers (
+    id SERIAL PRIMARY KEY,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    created_at FLOAT
+)
+""")
+conn.commit()
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS shop_pending_questions (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    question TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at FLOAT
+)
+""")
+conn.commit()
+
+cur.execute("""
 ALTER TABLE shop_products ADD COLUMN IF NOT EXISTS cost INTEGER DEFAULT 0
 """)
 conn.commit()
@@ -389,6 +410,17 @@ def clean_cart(user_id, context=None):
     carts[user_id] = new_cart
     return new_cart
 
+def count_products(context, filter_func=None):
+    total = 0
+    for p in products:
+        available = p["count"] - p.get("reserved", 0)
+
+        if available > 0 and filter_check(p, context):
+            if not filter_func or filter_func(p):
+                total += available
+
+    return total
+
 def load_products_from_db():
     global products
     get_connection()  # 🔥 ulanish tekshiruvi
@@ -412,16 +444,441 @@ def load_products_from_db():
             "count": r[9],
             "reserved": r[10]
         })
-def count_products(context, filter_func=None):
-    total = 0
-    for p in products:
-        available = p["count"] - p.get("reserved", 0)
+async def send_voice_message(update, context, text):
+    """Matnni ovozga aylantirib yuboradi (gTTS orqali)"""
+    from gtts import gTTS
+    import tempfile
 
-        if available > 0 and filter_check(p, context):
-            if not filter_func or filter_func(p):
-                total += available
+    tts = gTTS(text=text, lang='uz' if False else 'ru')  # uz yo'q, ru yaqinroq talaffuz beradi
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+        tts.save(f.name)
+        path = f.name
 
-    return total
+    with open(path, "rb") as audio:
+        await update.message.reply_voice(voice=audio)
+
+    try:
+        os.remove(path)
+    except Exception:
+        pass
+
+
+def levenshtein(a, b):
+    """Ikki so'z orasidagi farq (necha harf almashtirish kerak)"""
+    if len(a) < len(b):
+        return levenshtein(b, a)
+    if len(b) == 0:
+        return len(a)
+    prev_row = range(len(b) + 1)
+    for i, ca in enumerate(a):
+        curr_row = [i + 1]
+        for j, cb in enumerate(b):
+            ins = prev_row[j + 1] + 1
+            dele = curr_row[j] + 1
+            sub = prev_row[j] + (ca != cb)
+            curr_row.append(min(ins, dele, sub))
+        prev_row = curr_row
+    return prev_row[-1]
+
+
+def fuzzy_contains(text, keywords):
+    """Matn ichida keywords dan biriga o'xshash so'z bormi (imlo xatoga chidamli)"""
+    words = text.split()
+    for keyword in keywords:
+        if keyword in text:
+            return True
+        for w in words:
+            if len(w) < 2:
+                continue
+            dist = levenshtein(w, keyword)
+            # so'z uzunligining ~35% xatoga ruxsat beriladi
+            allowed = max(1, len(keyword) // 3)
+            if dist <= allowed:
+                return True
+    return False
+
+
+async def find_learned_answer(question: str):
+    """Admin tomonidan avval o'rgatilgan javoblardan mos kelganini topadi"""
+    get_connection()
+    q = norm(question)
+
+    cur.execute("SELECT question, answer FROM shop_learned_answers")
+    rows = cur.fetchall()
+
+    best_match = None
+    best_dist = 999
+
+    for db_question, db_answer in rows:
+        dbq = norm(db_question)
+        # to'liq mos kelsa — darhol qaytaramiz
+        if q == dbq:
+            return db_answer
+        # o'xshashlikni tekshiramiz (so'zlar kesishishi)
+        q_words = set(q.split())
+        dbq_words = set(dbq.split())
+        if not q_words or not dbq_words:
+            continue
+        common = q_words & dbq_words
+        overlap_ratio = len(common) / max(len(q_words), len(dbq_words))
+        if overlap_ratio >= 0.6:
+            return db_answer
+
+    return None
+
+
+async def save_pending_question(user_id: int, question: str):
+    """Javobsiz savolni saqlaydi va adminga yuboradi"""
+    get_connection()
+    cur.execute(
+        "INSERT INTO shop_pending_questions (user_id, question, status, created_at) VALUES (%s, %s, 'pending', %s) RETURNING id",
+        (user_id, question, time.time())
+    )
+    q_id = cur.fetchone()[0]
+    conn.commit()
+    return q_id
+
+
+AGE_TO_SIZE = [
+    (0, 0.25, "56"),
+    (0.25, 0.5, "62-68"),
+    (0.5, 1, "74-80"),
+    (1, 2, "86-92"),
+    (2, 3, "92-98"),
+    (3, 4, "98-104"),
+    (4, 5, "104-110"),
+    (5, 6, "110-116"),
+    (6, 7, "116-122"),
+    (7, 8, "122-128"),
+    (8, 9, "128-134"),
+    (9, 10, "134-140"),
+    (10, 12, "140-152"),
+]
+
+
+def age_to_size_range(age_years: float):
+    """Yoshni O'rta Osiyo standart razmer oralig'iga aylantiradi"""
+    for lo, hi, size_range in AGE_TO_SIZE:
+        if lo <= age_years < hi:
+            return size_range
+    return "140-152"
+
+
+def extract_age_from_text(text: str):
+    """Matndan yosh raqamini topadi (masalan '5 yosh', '5 yoshli', '5 yoshga')"""
+    import re
+    m = re.search(r'(\d+)\s*(yosh|yoshli|yoshga|yoshda)', text.lower())
+    if m:
+        return int(m.group(1))
+    return None
+
+
+async def send_products_album(bot, chat_id, matched_products, title=""):
+    """Topilgan mahsulotlarni rasm albomi + tugmalar bilan yuboradi"""
+    if not matched_products:
+        return
+
+    if title:
+        await bot.send_message(chat_id=chat_id, text=title)
+
+    # Faqat rasmi bor mahsulotlarni olamiz, 10 tadan ko'p bo'lmasin (Telegram albom cheklovi)
+    with_photo = [p for p in matched_products if p.get("photo")][:10]
+
+    if with_photo:
+        media = []
+        for i, p in enumerate(with_photo):
+            caption = f"{i+1}) {p['name']}\n📏 {p['size']}sm  💰 {p['price']}"
+            media.append(InputMediaPhoto(media=p["photo"], caption=caption))
+        try:
+            await bot.send_media_group(chat_id=chat_id, media=media)
+        except Exception as e:
+            print("Album xato:", e)
+
+    # Har biriga alohida "Savatga qo'shish" tugmasi
+    for p in with_photo:
+        try:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=f"👆 {p['name']} — {p['size']}sm",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🛒 Savatga qo'shish", callback_data=f"add_{p['id']}")
+                ]])
+            )
+        except Exception as e:
+            print("Tugma xato:", e)
+
+    if len(matched_products) > len(with_photo):
+        remaining = len(matched_products) - len(with_photo)
+        await bot.send_message(chat_id=chat_id, text=f"...va yana {remaining} ta rasmsiz mahsulot bor")
+
+
+async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> tuple:
+    """
+    DB dagi mahsulotlarni tahlil qilib savolga javob beradi.
+    Qaytaradi: (javob_matni, javob_topildimi_bool, mos_mahsulotlar_royxati_yoki_None)
+    """
+    # 1. Avval o'rgatilgan javoblarni tekshiramiz
+    learned = await find_learned_answer(question)
+    if learned:
+        return (learned, True, None)
+
+    q = norm(question)
+
+    # Salomlashish
+    if fuzzy_contains(q, ["salom", "assalomu", "salm", "hey", "hi"]):
+        return (
+            "👋 Salom! Xush kelibsiz!\n\n"
+            "Men bolalar kiyimlari do'konining yordamchisiman. "
+            "Mahsulotlar, narxlar, razmerlar haqida savol berishingiz mumkin.\n\n"
+            "Masalan: \"44 razmer bormi?\" yoki \"Eng arzon narx qancha?\"",
+            True,
+            None
+        )
+
+    # Bot nima qiladi
+    if fuzzy_contains(q, ["nima qilasan", "kim san", "kimsan", "botmisan", "sen kim", "nima bot"]):
+        return (
+            "🤖 Men — bolalar kiyimlari do'konining AI yordamchisiman.\n\n"
+            "Men bilan:\n"
+            "• Mahsulot qidirishingiz mumkin (razmer, narx, jins bo'yicha)\n"
+            "• Qaysi fabrikadan nima bor — bilishingiz mumkin\n"
+            "• Eng arzon/qimmat narxlarni topishingiz mumkin\n\n"
+            "🛍 Kiyimlarni qidirish orqali esa to'liq katalogni ko'rishingiz mumkin!",
+            True,
+            None
+        )
+
+    # Bu qanaqa bot
+    if fuzzy_contains(q, ["qanaqa bot", "qanday bot", "nima uchun", "bu nima"]):
+        return (
+            "🛍 Bu — bolalar kiyimlari onlayn do'koni boti.\n\n"
+            "Bu yerda turli razmer, rang va fabrikalardan bolalar kiyimlarini "
+            "ko'rib, tanlab, buyurtma berishingiz mumkin.",
+            True,
+            None
+        )
+
+    # Aloqa / bog'lanish
+    if fuzzy_contains(q, ["aloqa", "bog'lanish", "boglanish", "telefon", "raqam", "murojaat", "gaplashish"]):
+        return (
+            "📞 Aloqa uchun:\n\n"
+            "Telefon: +998915388499\n"
+            "Manzil: Samarqand, Pastdarg'om, Charxin\n\n"
+            "Yoki botda buyurtma bersangiz, admin siz bilan o'zi bog'lanadi!",
+            True,
+            None
+        )
+
+    # Yetkazib berish / dastavka
+    if fuzzy_contains(q, ["yetkazib", "dastavka", "yetkazish", "kurier", "yetgazish"]):
+        return (
+            "🚚 Yetkazib berish xizmati mavjud!\n\n"
+            "Dastavka narxi taxminan 20 000–50 000 so'm atrofida (masofaga qarab).\n"
+            "Buyurtma berganingizda lokatsiyangizni yuborasiz, shunga qarab hisoblanadi.\n\n"
+            "📍 Olib ketish ham mumkin: Samarqand, Pastdarg'om, Charxin",
+            True,
+            None
+        )
+
+    # Narx umumiy
+    if fuzzy_contains(q, ["arzonmi", "qimmatmi", "narxlar qanday", "narxi qanday"]):
+        return (
+            "💰 Narxlarimiz hamyonbop!\n\n"
+            "Turli mahsulotlar 30 000 so'mdan boshlanadi.\n"
+            "Aniq narxni bilish uchun: \"Eng arzon narx qancha?\" deb so'rang, "
+            "yoki 🛍 Kiyimlarni qidirish orqali to'liq narxlarni ko'ring.",
+            True,
+            None
+        )
+
+    # Rahmat / xayr
+    if fuzzy_contains(q, ["rahmat", "raxmat", "tashakkur", "xayr", "salomat"]):
+        return ("😊 Arzimaydi! Yana savolingiz bo'lsa, murojaat qiling. Xarid qilishda omad!", True, None)
+
+    load_products_from_db()
+    available_products = [p for p in products if (p.get("count", 0) - p.get("reserved", 0)) > 0]
+
+    if not available_products:
+        return ("❌ Hozircha mavjud mahsulot yo'q.", True, None)
+
+    # Narx so'ralganda
+    if fuzzy_contains(q, ["arzon", "past narx", "kam narx", "arzoni"]):
+        cheapest = min(available_products, key=lambda p: int(''.join(filter(str.isdigit, str(p.get("price", "0")))) or 0))
+        return (
+            f"💰 Eng arzon mahsulot:\n\n"
+            f"📛 {cheapest['name']}\n"
+            f"📏 {cheapest['size']} sm\n"
+            f"💵 {cheapest['price']}",
+            True,
+            None
+        )
+
+    if fuzzy_contains(q, ["qimmat", "yuqori narx"]):
+        priciest = max(available_products, key=lambda p: int(''.join(filter(str.isdigit, str(p.get("price", "0")))) or 0))
+        return (
+            f"💎 Eng qimmat mahsulot:\n\n"
+            f"📛 {priciest['name']}\n"
+            f"📏 {priciest['size']} sm\n"
+            f"💵 {priciest['price']}",
+            True,
+            None
+        )
+
+    # 🔥 Yosh so'ralganda — razmer oralig'iga aylantiramiz
+    age = extract_age_from_text(question)
+    size_filter_from_age = None
+    if age is not None:
+        size_range = age_to_size_range(age)
+        size_filter_from_age = size_range
+        lo_s, hi_s = (size_range.split("-") if "-" in size_range else (size_range, size_range))
+        lo_s, hi_s = int(lo_s), int(hi_s)
+
+        age_matches = []
+        for p in available_products:
+            raw = norm(p.get("size")).replace("sm", "").strip()
+            if "-" in raw:
+                parts = raw.split("-")
+                if len(parts) >= 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                    p_lo, p_hi = int(parts[0]), int(parts[1])
+                    if not (p_hi < lo_s or p_lo > hi_s):
+                        age_matches.append(p)
+            elif raw.isdigit():
+                p_size = int(raw)
+                if lo_s <= p_size <= hi_s:
+                    age_matches.append(p)
+
+        # Agar jins ham aytilgan bo'lsa, qo'shimcha filtrlaymiz
+        if fuzzy_contains(q, ["qiz", "qizga", "qizlarga"]):
+            age_matches = [p for p in age_matches if "qiz" in norm(p.get("gender"))]
+            gender_txt = "qizlar"
+        elif fuzzy_contains(q, ["ogil", "bola"]):
+            age_matches = [p for p in age_matches if "ogil" in norm(p.get("gender"))]
+            gender_txt = "o'g'il bolalar"
+        else:
+            gender_txt = "bolalar"
+
+        text = (
+            f"👶 {age} yoshli {gender_txt} uchun taxminan {size_range} sm razmer mos keladi.\n\n"
+            f"⚠️ Bolalar bo'yi turlicha bo'lishi mumkin — aniqroq natija uchun "
+            f"kiyim uzunligini santimetrda o'lchab, aniq raqamni yozing (masalan: \"106 sm\").\n\n"
+        )
+        if age_matches:
+            text += f"📦 Hozircha {len(age_matches)} ta mos mahsulot topildi, rasmlarini yubormoqdaman:"
+            return (text, True, age_matches)
+        else:
+            text += "❌ Hozircha shu oraliqda mahsulot yo'q."
+            return (text, True, None)
+
+    # Razmer so'ralganda (aniq santimetr)
+    digits = ''.join(filter(str.isdigit, question))
+    if digits and len(digits) <= 3:
+        size_num = int(digits)
+        matches = []
+        for p in available_products:
+            raw = norm(p.get("size")).replace("sm", "").strip()
+            if "-" in raw:
+                parts = raw.split("-")
+                if len(parts) >= 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                    lo, hi = int(parts[0]), int(parts[1])
+                    if lo <= size_num <= hi:
+                        matches.append(p)
+            elif raw.isdigit():
+                if abs(int(raw) - size_num) <= 1:
+                    matches.append(p)
+
+        if matches:
+            text = f"📏 {size_num} sm razmerda {len(matches)} ta mahsulot topildi, rasmlarini yubormoqdaman:"
+            return (text, True, matches)
+        else:
+            return (f"❌ {size_num} sm razmerda hozircha mahsulot yo'q.", True, None)
+
+    # Jins bo'yicha
+    if fuzzy_contains(q, ["qiz", "qizlar", "qizga", "qizlarga"]):
+        matches = [p for p in available_products if "qiz" in norm(p.get("gender"))]
+        if matches:
+            text = f"👧 Qizlar uchun {len(matches)} ta mahsulot topildi, rasmlarini yubormoqdaman:"
+            return (text, True, matches)
+        return ("❌ Hozircha qizlar uchun mahsulot yo'q.", True, None)
+
+    if fuzzy_contains(q, ["ogil", "ogillar", "bola", "bolalar"]):
+        matches = [p for p in available_products if "ogil" in norm(p.get("gender"))]
+        if matches:
+            text = f"👦 O'g'il bolalar uchun {len(matches)} ta mahsulot topildi, rasmlarini yubormoqdaman:"
+            return (text, True, matches)
+        return ("❌ Hozircha o'g'il bolalar uchun mahsulot yo'q.", True, None)
+
+    # Fabrika bo'yicha
+    origin_map = [
+        (["xitoy", "hitoy", "kitoy"], "xitoy"),
+        (["vodiy", "vodey"], "vodiy"),
+        (["turkiya", "turkia", "turkya"], "turkiya"),
+        (["mart", "8mart", "8-mart"], "8-mart"),
+    ]
+    for keywords, origin_db in origin_map:
+        if fuzzy_contains(q, keywords):
+            matches = [p for p in available_products if origin_db in norm(p.get("origin"))]
+            if matches:
+                text = f"🏭 {origin_db.capitalize()} fabrikasidan {len(matches)} ta mahsulot topildi, rasmlarini yubormoqdaman:"
+                return (text, True, matches)
+            return (f"❌ {origin_db.capitalize()} fabrikasidan hozircha mahsulot yo'q.", True, None)
+
+    # Kategoriya bo'yicha
+    category_map = [
+        (["futbolka", "futbalka", "futbolca", "futbolk"], "futbolka"),
+        (["shim", "shimlar"], "shim"),
+        (["shortik", "shortiq", "shorik"], "shortik"),
+        (["talik", "kostyum", "komplekt"], "talik"),
+        (["qalin", "kurtka", "jaket"], "qalin"),
+        (["oyoq", "poyabzal", "botinka"], "oyoq"),
+        (["bosh", "kepka", "shapka"], "bosh"),
+        (["ichki", "trusik", "mayka"], "ichki"),
+    ]
+    for keywords, cat_db in category_map:
+        if fuzzy_contains(q, keywords):
+            matches = [p for p in available_products if cat_db in norm(p.get("category"))]
+            if matches:
+                text = f"👕 {keywords[0].capitalize()} — {len(matches)} ta mahsulot topildi, rasmlarini yubormoqdaman:"
+                return (text, True, matches)
+            return (f"❌ Hozircha {keywords[0]} yo'q.", True, None)
+
+    # Umumiy holat: nechta mahsulot bor
+    if fuzzy_contains(q, ["nechta", "qancha", "bor", "mavjud", "bormi"]):
+        names = set(p['name'] for p in available_products)
+        return (
+            f"📦 Hozirda do'konda {len(names)} xil mahsulot mavjud, "
+            f"jami {len(available_products)} ta razmer variantida.\n\n"
+            f"🛍 Kiyimlarni qidirish orqali to'liq ko'rishingiz mumkin!",
+            True,
+            None
+        )
+
+    # 🔥 HECH NARSA TOPILMASA — savolni saqlaymiz va adminga yuboramiz
+    if user_id is not None and bot is not None:
+        q_id = await save_pending_question(user_id, question)
+        try:
+            await bot.send_message(
+                chat_id=ADMIN_ID,
+                text=(
+                    f"🆕 Yangi savol (botim javob berolmadi):\n\n"
+                    f"👤 User ID: {user_id}\n"
+                    f"❓ Savol: {question}\n\n"
+                    f"Javob berish uchun: /javob {q_id} Sizning javobingiz"
+                )
+            )
+        except Exception as e:
+            print("Admin xabar xato:", e)
+
+    return (
+        "🤔 Kechirasiz, bu savolga hozircha aniq javobim yo'q.\n\n"
+        "Savolingizni adminimizga yubordim, tez orada javob beriladi.\n\n"
+        "Shu orada, mahsulotlar haqida so'rashingiz mumkin:\n"
+        "📏 Razmer: \"44 bormi?\"\n"
+        "💰 Narx: \"Eng arzon narx qancha?\"\n"
+        "👕 Kategoriya: \"Futbolka bormi?\"\n\n"
+        "Yoki 🛍 Kiyimlarni qidirish orqali to'liq katalogni ko'ring!",
+        False,
+        None
+    )
 
 
 ADMIN_MENU = ReplyKeyboardMarkup(
@@ -436,7 +893,7 @@ ADMIN_MENU = ReplyKeyboardMarkup(
 MAIN_MENU = ReplyKeyboardMarkup(
     [
         ["🛍 Kiyimlarni qidirish", "🧺 Savat"],
-        ["ℹ️ Yordam"]
+        ["🤖 AI Yordamchi", "ℹ️ Yordam"]
     ],
     resize_keyboard=True
 )
@@ -1163,7 +1620,19 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif text == "ℹ️ Yordam":
 
-            # 1-QISM
+            yordam_matn = (
+                "Kiyimni qanday o'lchash. "
+                "Bolaga mos eski kiyimni oling, stolga tekis qo'ying va yuqoridan pastgacha uzunligini santimetrda o'lchang. "
+                "Masalan qirq to'rt santimetr chiqdi. Shu o'lcham eng muhim, chunki bot aynan shu bo'yicha ishlaydi. "
+                "Qidirish va tanlash. "
+                "Botga qirq to'rt yozsangiz, qirq uch, qirq to'rt, qirq besh santimetrli kiyimlar chiqadi. "
+                "Bu sizga yaqin o'lchamlarni ko'rsatadi. "
+                "Kattaroq kerak bo'lsa, qirq olti yozing. Kichikroq kerak bo'lsa, qirq ikki yozing. "
+                "Buyurtma berish. "
+                "Yoqgan kiyimni tanlab, savatga qo'shing. Savatga kiring. Buyurtma berish ni bosing. "
+                "Telefon raqamingizni yozing. Shu bilan buyurtma tugaydi va siz bilan bog'lanishadi."
+            )
+
             await update.message.reply_text(
                 "📏 1-QISM: Kiyimni qanday o‘lchash\n\n"
                 "Bolaga mos eski kiyimni oling, stolga tekis qo‘ying va yuqoridan pastgacha uzunligini santimetrda o‘lchang. "
@@ -1171,7 +1640,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Endi shu raqamni eslab qoling, chunki keyingi qadamda aynan shu orqali qidiruv qilasiz."
             )
 
-            # 2-QISM
             await update.message.reply_text(
                 "🔎 2-QISM: Qidirish va tanlash\n\n"
                 "Botga 44 yozsangiz → 43, 44, 45 sm kiyimlar chiqadi. "
@@ -1181,7 +1649,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Har bir kiyim ostida uzunligi yozilgan bo‘ladi, shu raqamga qarab tanlang."
             )
 
-            # 3-QISM
             await update.message.reply_text(
                 "🛒 3-QISM: Buyurtma berish\n\n"
                 "Yoqgan kiyimni tanlab 🛒 Savatga qo‘shing.\n"
@@ -1189,7 +1656,40 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🚚 Buyurtma berish ni bosing.\n"
                 "Telefon raqamingizni yozing.\n\n"
                 "Shu bilan buyurtma tugaydi va siz bilan bog‘lanishadi."
-            )                   
+            )
+
+            # 🔊 Ovozli yordam yuborish
+            try:
+                await send_voice_message(update, context, yordam_matn)
+            except Exception as e:
+                print("TTS XATO:", e)
+
+        elif text == "🤖 AI Yordamchi":
+            context.user_data["ai_mode"] = True
+            await update.message.reply_text(
+                "🤖 AI Yordamchi\n\n"
+                "Menga mahsulotlar haqida savol bering, masalan:\n"
+                "• 34 razmerda futbolka bormi?\n"
+                "• Eng arzon narx qancha?\n"
+                "• Qizlar uchun nima bor?\n"
+                "• Xitoy fabrikasidan nima bor?\n\n"
+                "Yozing 👇",
+                reply_markup=ReplyKeyboardMarkup([["🏠 Bosh menyu"]], resize_keyboard=True)
+            )
+
+        elif context.user_data.get("ai_mode"):
+            answer, found, matches = await ai_assistant_answer(text, update.effective_user.id, context.bot)
+            await update.message.reply_text(
+                answer,
+                reply_markup=ReplyKeyboardMarkup([["🤖 Yana savol", "🏠 Bosh menyu"]], resize_keyboard=True)
+            )
+            if matches:
+                await send_products_album(context.bot, update.effective_chat.id, matches)
+
+        elif text == "🤖 Yana savol":
+            context.user_data["ai_mode"] = True
+            await update.message.reply_text("🤖 Savolingizni yozing:")
+
         elif context.user_data.get("step") == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
             season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
             context.user_data["filter_season"] = season
@@ -3436,11 +3936,99 @@ async def shablon_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     )
 
+
+async def javob_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin /javob <savol_id> <javob matni> orqali botni o'rgatadi"""
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text(
+            "❌ Format: /javob <ID> <javob matni>\n\n"
+            "Masalan: /javob 5 Bizda faqat naqd pul qabul qilinadi"
+        )
+        return
+
+    try:
+        q_id = int(args[0])
+    except ValueError:
+        await update.message.reply_text("❌ ID raqam bo'lishi kerak")
+        return
+
+    answer_text = " ".join(args[1:])
+
+    get_connection()
+    cur.execute("SELECT user_id, question, status FROM shop_pending_questions WHERE id=%s", (q_id,))
+    row = cur.fetchone()
+
+    if not row:
+        await update.message.reply_text(f"❌ #{q_id} raqamli savol topilmadi")
+        return
+
+    target_user_id, question, status = row
+
+    if status == "answered":
+        await update.message.reply_text(f"⚠️ Bu savolga allaqachon javob berilgan")
+        return
+
+    # 🔥 Javobni bilim bazasiga saqlaymiz — bot buni eslab qoladi
+    cur.execute(
+        "INSERT INTO shop_learned_answers (question, answer, created_at) VALUES (%s, %s, %s)",
+        (question, answer_text, time.time())
+    )
+    cur.execute(
+        "UPDATE shop_pending_questions SET status='answered' WHERE id=%s",
+        (q_id,)
+    )
+    conn.commit()
+
+    # Foydalanuvchiga javob yuboramiz
+    try:
+        await context.bot.send_message(
+            chat_id=target_user_id,
+            text=f"💬 Savolingizga javob:\n\n{answer_text}"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Foydalanuvchiga yuborilmadi: {e}")
+
+    await update.message.reply_text(
+        f"✅ Javob saqlandi va yuborildi!\n\n"
+        f"❓ Savol: {question}\n"
+        f"💬 Javob: {answer_text}\n\n"
+        f"Endi shunga o'xshash savol kelsa, bot avtomatik shu javobni beradi."
+    )
+
+
+async def pending_questions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin uchun javobsiz savollar ro'yxati"""
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    get_connection()
+    cur.execute(
+        "SELECT id, user_id, question FROM shop_pending_questions WHERE status='pending' ORDER BY id DESC LIMIT 20"
+    )
+    rows = cur.fetchall()
+
+    if not rows:
+        await update.message.reply_text("✅ Javobsiz savollar yo'q!")
+        return
+
+    text = "📋 Javobsiz savollar:\n\n"
+    for q_id, uid, question in rows:
+        text += f"🆔 {q_id} | {question}\n   /javob {q_id} <javob>\n\n"
+
+    await update.message.reply_text(text)
+
+
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("get_id", get_id_command))
 app.add_handler(CommandHandler("done", done_command))
 app.add_handler(CommandHandler("shablon", shablon_command))
+app.add_handler(CommandHandler("javob", javob_command))
+app.add_handler(CommandHandler("savollar", pending_questions_command))
 app.add_handler(MessageHandler(filters.Document.ALL, excel_import_handler))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 app.add_handler(MessageHandler(filters.PHOTO, photo_handler))
