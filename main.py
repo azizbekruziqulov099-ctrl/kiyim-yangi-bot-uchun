@@ -516,31 +516,69 @@ def fuzzy_contains(text, keywords):
     return False
 
 
+STOP_WORDS = {
+    "sen", "siz", "sizni", "seni", "nima", "qanday", "qachon", "qayerda",
+    "bu", "shu", "u", "men", "biz", "ular", "bor", "bormi", "bolsa",
+    "va", "ham", "yoki", "lekin", "ammo", "chunki", "uchun", "bilan", "ni", "ning",
+    "ga", "da", "dan", "mi", "chi", "a", "e", "o", "yo", "deb"
+}
+
+
+def extract_keywords(text: str):
+    """Muhim so'zlarni ajratib oladi (stop so'zlarsiz)"""
+    words = norm(text).split()
+    return [w for w in words if w not in STOP_WORDS and len(w) > 1]
+
+
+def word_match(kw: str, dbkw: str) -> bool:
+    """Ikki so'z bir xil o'zakdan yoki o'xshash bo'lsa True"""
+    if kw == dbkw:
+        return True
+    shorter, longer = (kw, dbkw) if len(kw) < len(dbkw) else (dbkw, kw)
+    if len(shorter) >= 4 and shorter in longer:
+        return True
+    dist = levenshtein(kw, dbkw)
+    allowed = max(1, len(dbkw) // 3)
+    return dist <= allowed
+
+
 async def find_learned_answer(question: str):
-    """Admin tomonidan avval o'rgatilgan javoblardan mos kelganini topadi"""
+    """Admin tomonidan avval o'rgatilgan javoblardan mos kelganini topadi (kalit so'z + fuzzy)"""
     get_connection()
     q = norm(question)
+    q_keywords = extract_keywords(question)
 
     cur.execute("SELECT question, answer FROM shop_learned_answers")
     rows = cur.fetchall()
 
-    best_match = None
-    best_dist = 999
+    best_answer = None
+    best_score = 0.0
 
     for db_question, db_answer in rows:
         dbq = norm(db_question)
-        # to'liq mos kelsa — darhol qaytaramiz
+
         if q == dbq:
             return db_answer
-        # o'xshashlikni tekshiramiz (so'zlar kesishishi)
-        q_words = set(q.split())
-        dbq_words = set(dbq.split())
-        if not q_words or not dbq_words:
+
+        dbq_keywords = extract_keywords(db_question)
+        if not q_keywords or not dbq_keywords:
             continue
-        common = q_words & dbq_words
-        overlap_ratio = len(common) / max(len(q_words), len(dbq_words))
-        if overlap_ratio >= 0.6:
-            return db_answer
+
+        matched = 0
+        for kw in q_keywords:
+            for dbkw in dbq_keywords:
+                if word_match(kw, dbkw):
+                    matched += 1
+                    break
+
+        score = matched / max(len(q_keywords), len(dbq_keywords))
+
+        if score > best_score:
+            best_score = score
+            best_answer = db_answer
+
+    if best_score >= 0.5:
+        return best_answer
 
     return None
 
@@ -1745,18 +1783,23 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=ReplyKeyboardMarkup([["🏠 Bosh menyu"]], resize_keyboard=True)
             )
 
+        elif text == "🤖 Yana savol":
+            context.user_data["ai_mode"] = True
+            await update.message.reply_text("🤖 Savolingizni yozing:")
+
         elif context.user_data.get("ai_mode"):
             answer, found, matches = await ai_assistant_answer(text, update.effective_user.id, context.bot)
             await update.message.reply_text(
                 answer,
                 reply_markup=ReplyKeyboardMarkup([["🤖 Yana savol", "🏠 Bosh menyu"]], resize_keyboard=True)
             )
+            if found:
+                try:
+                    await send_voice_message(update, context, answer)
+                except Exception as e:
+                    print("AI TTS XATO:", e)
             if matches:
                 await send_products_album(context.bot, update.effective_chat.id, matches)
-
-        elif text == "🤖 Yana savol":
-            context.user_data["ai_mode"] = True
-            await update.message.reply_text("🤖 Savolingizni yozing:")
 
         elif context.user_data.get("step") == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
             season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
