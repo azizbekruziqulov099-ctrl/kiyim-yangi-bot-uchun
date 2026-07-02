@@ -293,83 +293,80 @@ def get_category_buttons(context):
         ["🔙 Orqaga", "🏠 Bosh menyu"]
     ]
 
+def norm(s):
+    """Matnni solishtirish uchun tozalaydi: kichik harf, bo'shliqsiz, apostrofsiz"""
+    if s is None:
+        return ""
+    s = str(s).strip().lower()
+    s = s.replace("\u2018", "'").replace("\u2019", "'").replace("`", "'")
+    s = s.replace("'", "")
+    return s
+
+
 def filter_check(p, context):
+    ud = context.user_data
 
-    # 🔥 gender
-    g = context.user_data.get("filter_gender")
-    if g:
-        if g.lower() not in str(p.get("gender", "")).lower():
-            return False
-
-    # 🔥 origin
-    o = context.user_data.get("filter_origin")
-    if o:
-        if o.lower() not in str(p.get("origin", "")).lower():
-            return False
-
-    # 🔥 category (YENGIL VA ISHONCHLI)
-    c = context.user_data.get("filter_category")
-    if c:
-        user_cat = str(c).strip().lower()
-        prod_cat = str(p.get("category", "")).strip().lower()
-
-        if not prod_cat:
-            return False
-
-        # 🔥 faqat o‘xshashlikni tekshiramiz (soft)
-        if user_cat not in prod_cat:
-            return False
-
-    # 🔥 season (TOZA)
-    s = context.user_data.get("filter_season")
-    if s:
-        season = str(s).strip().lower()
-
-        p_seasons = p.get("season", [])
-
-        # har doim listga aylantiramiz
-        if not isinstance(p_seasons, list):
-            p_seasons = str(p_seasons).split(",")
-
-        p_seasons = [str(x).strip().lower() for x in p_seasons]
-
-        if season not in p_seasons:
-            return False
-
-    # 🔥 size
-    if context.user_data.get("filter_size"):
-        size_text = context.user_data.get("filter_size")
-        if str(size_text).isdigit():
-            size = int(size_text)
-            raw = str(p.get("size") or "").lower().replace("sm", "").strip()
-
-            if raw == "":
-                print(f"DEBUG: {p['name']} - o'lcham bo'sh")
-                return False
-
-            if "-" in raw:
-                parts = raw.split("-")
-                if len(parts) >= 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
-                    s1, s2 = int(parts[0]), int(parts[1])
-                    if not (s1 <= size <= s2):
-                        print(f"DEBUG: {p['name']} - o'lcham diapazonga tushmadi ({s1}-{s2})")
-                        return False
-                else: return False
-            else:
-                if not raw.isdigit(): return False
-                p_size = int(raw)
-                if abs(p_size - size) > 1:
-                    print(f"DEBUG: {p['name']} - o'lcham mos kelmadi (P:{p_size}, U:{size})")
-                    return False
-
-    # 🔥 mavjudlik (Eng ko'p xato shu yerda bo'ladi)
-    available = p.get("count", 0) - p.get("reserved", 0)
-
+    # mavjudlik — eng avval tekshiramiz
+    count = p.get("count") or 0
+    reserved = p.get("reserved") or 0
+    available = count - reserved
     if available <= 0:
         return False
 
-    # Agar barcha shartlardan o'tsa
-    return True 
+    # gender
+    g = ud.get("filter_gender")
+    if g:
+        if norm(g) not in norm(p.get("gender")):
+            return False
+
+    # origin
+    o = ud.get("filter_origin")
+    if o:
+        if norm(o) not in norm(p.get("origin")):
+            return False
+
+    # category
+    c = ud.get("filter_category")
+    if c:
+        if norm(c) not in norm(p.get("category")):
+            return False
+
+    # season
+    s = ud.get("filter_season")
+    if s:
+        season_norm = norm(s)
+        p_seasons = p.get("season", [])
+        if not isinstance(p_seasons, list):
+            p_seasons = str(p_seasons).split(",")
+        p_seasons_norm = [norm(x) for x in p_seasons]
+        if season_norm not in p_seasons_norm:
+            return False
+
+    # size
+    size_filter = ud.get("filter_size")
+    if size_filter and str(size_filter).strip().isdigit():
+        want = int(size_filter)
+        raw = norm(p.get("size")).replace("sm", "").strip()
+
+        if not raw:
+            return False
+
+        if "-" in raw:
+            parts = raw.split("-")
+            if len(parts) >= 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                lo, hi = int(parts[0]), int(parts[1])
+                if not (lo <= want <= hi):
+                    return False
+            else:
+                return False
+        else:
+            if not raw.isdigit():
+                return False
+            p_size = int(raw)
+            if abs(p_size - want) > 1:
+                return False
+
+    return True
 def clean_cart(user_id, context=None):
     
     now = time.time()
