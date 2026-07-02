@@ -799,15 +799,32 @@ async def excel_import_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             razmer_counts = Counter(razmers)
 
             for razmer, cnt in razmer_counts.items():
+                # 🔥 DUPLIKAT TEKSHIRUVI — bir xil mahsulot bo'lsa, sonini yangilaymiz
                 cur.execute("""
-                    INSERT INTO shop_products
-                        (photo, gender, origin, season, category, name, size, price, count, reserved, cost)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s)
-                """, (
-                    photo, gender, origin, season_db,
-                    category, name, razmer, price_str,
-                    cnt, cost_int
-                ))
+                    SELECT id, count FROM shop_products
+                    WHERE name=%s AND size=%s AND gender=%s AND origin=%s AND category=%s
+                    LIMIT 1
+                """, (name, razmer, gender, origin, category))
+                existing = cur.fetchone()
+
+                if existing:
+                    # Mavjud bo'lsa — ustiga yozamiz (yangilaymiz, qo'shmaymiz)
+                    existing_id = existing[0]
+                    cur.execute("""
+                        UPDATE shop_products
+                        SET photo=%s, price=%s, count=%s, cost=%s, season=%s
+                        WHERE id=%s
+                    """, (photo, price_str, cnt, cost_int, season_db, existing_id))
+                else:
+                    cur.execute("""
+                        INSERT INTO shop_products
+                            (photo, gender, origin, season, category, name, size, price, count, reserved, cost)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s)
+                    """, (
+                        photo, gender, origin, season_db,
+                        category, name, razmer, price_str,
+                        cnt, cost_int
+                    ))
                 added += 1
         except Exception as e:
             errors.append(f"Qator {row_num}: DB xato — {e}")
