@@ -542,6 +542,37 @@ def word_match(kw: str, dbkw: str) -> bool:
     return dist <= allowed
 
 
+def is_nonsense_question(text: str) -> bool:
+    """Savol mantiqsiz/tushunarsiz ekanligini tekshiradi"""
+    q = text.strip()
+
+    # Juda qisqa (1-2 belgi)
+    if len(q) <= 2:
+        return True
+
+    # Faqat raqam yoki belgilardan iborat (harflar yo'q)
+    letters_only = ''.join(c for c in q if c.isalpha())
+    if len(letters_only) < 2:
+        return True
+
+    # Bir xil harf ko'p marta takrorlansa (masalan "aaaaa", "ыыыыы")
+    if len(set(letters_only.lower())) <= 2 and len(letters_only) >= 4:
+        return True
+
+    # Unli harflar umuman yo'q (tasodifiy klaviatura bosish belgisi)
+    unli = set("aeiouoʻ'aeiouy")
+    letters_lower = letters_only.lower()
+    if len(letters_lower) >= 5 and not any(c in unli for c in letters_lower):
+        return True
+
+    # Juda ko'p turli belgi/husiy alifbo aralashgan (spam)
+    words = q.split()
+    if len(words) == 1 and len(words[0]) > 25:
+        return True
+
+    return False
+
+
 async def find_learned_answer(question: str):
     """Admin tomonidan avval o'rgatilgan javoblardan mos kelganini topadi (kalit so'z + fuzzy)"""
     get_connection()
@@ -725,6 +756,35 @@ async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> t
             None
         )
 
+    # Botdan qanday foydalanish
+    if fuzzy_contains(q, ["qanday foydalanaman", "qanday ishlataman", "botdan foydalanish", "qanday ishlatiladi"]):
+        return (
+            "🤖 Botdan qanday foydalanish:\n\n"
+            "1️⃣ Kiyim tanlash\n"
+            "\"🛍 Kiyimlarni qidirish\" tugmasini bosing → jins, fabrika, fasl va turini tanlang → "
+            "bolangizning kiyim uzunligini santimetrda yozing (masalan: 44)\n\n"
+            "2️⃣ Savatga qo'shish\n"
+            "Yoqqan kiyimning rasmi ostidagi \"🛒 Savatga qo'shish\" tugmasini bosing\n\n"
+            "3️⃣ Buyurtma berish\n"
+            "\"🧺 Savat\" ga kiring → \"🚚 Buyurtma\" tugmasini bosing → telefon raqamingizni qoldiring\n\n"
+            "4️⃣ Tayyor!\n"
+            "Adminimiz siz bilan tez orada bog'lanib, yetkazib berish yoki olib ketishni kelishadi",
+            True,
+            None
+        )
+
+    # Buyurtmadan keyin nima bo'ladi
+    if fuzzy_contains(q, ["buyurtma nima qilinadi", "buyurtmadan keyin", "buyurtma qanday", "buyurtma bergandan keyin"]):
+        return (
+            "📦 Buyurtma berilgach:\n\n"
+            "1. Sizning ma'lumotlaringiz (kiyim, telefon raqam) adminimizga yuboriladi\n"
+            "2. Admin siz bilan bog'lanadi va yetkazish yoki olib ketish vaqtini kelishadi\n"
+            "3. Kiyim tayyorlanadi va sizga yetkaziladi yoki siz olib ketasiz\n"
+            "4. To'lov qo'lda-qo'lga (naqd) amalga oshiriladi",
+            True,
+            None
+        )
+
     # Yetkazib berish / dastavka
     if fuzzy_contains(q, ["yetkazib", "dastavka", "yetkazish", "kurier", "yetgazish"]):
         return (
@@ -904,6 +964,19 @@ async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> t
             f"📦 Hozirda do'konda {len(names)} xil mahsulot mavjud, "
             f"jami {len(available_products)} ta razmer variantida.\n\n"
             f"🛍 Kiyimlarni qidirish orqali to'liq ko'rishingiz mumkin!",
+            True,
+            None
+        )
+
+    # 🔥 Avval savol mantiqiymi tekshiramiz
+    if is_nonsense_question(question):
+        return (
+            "🤔 Kechirasiz, savolingizni tushunmadim.\n\n"
+            "Iltimos, aniqroq va to'liq savol yozing. Masalan:\n"
+            "📏 \"44 razmer bormi?\"\n"
+            "💰 \"Eng arzon narx qancha?\"\n"
+            "👕 \"Futbolka bormi?\"\n"
+            "📞 \"Qanday bog'lanaman?\"",
             True,
             None
         )
