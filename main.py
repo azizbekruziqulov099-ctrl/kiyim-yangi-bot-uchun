@@ -435,8 +435,7 @@ ADMIN_MENU = ReplyKeyboardMarkup(
 
 MAIN_MENU = ReplyKeyboardMarkup(
     [
-        ["🔍 Qidirish"],
-        ["🛍 Kiyimlar", "🧺 Savat"],
+        ["🛍 Kiyimlarni qidirish", "🧺 Savat"],
         ["ℹ️ Yordam"]
     ],
     resize_keyboard=True
@@ -1012,7 +1011,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             context.user_data.clear()
 
-        elif text == "🔍 Qidirish":
+        elif text == "🛍 Kiyimlarni qidirish":
             context.user_data.clear()
 
             await update.message.reply_text(
@@ -1974,31 +1973,40 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             context.user_data["filter_size"] = size
 
-            found = False
+            filtered = [p for p in products if filter_check(p, context)]
 
-            for p in products:
-                if filter_check(p, context):
-                    found = True
-
-                    keyboard = [
-                        [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p['id']}")]
-                    ]
-
-                    await update.message.reply_photo(
-                        photo=p["photo"],
-                        caption=f"{p['name']}\n📏 {p['size']} sm\n💰 {p['price']}",
-                        reply_markup=InlineKeyboardMarkup(keyboard)
-                    )
-
-            # ❗ AGAR TOPILMASA
-            if not found:
+            if not filtered:
                 await update.message.reply_text(
                     "❌ Mos mahsulot topilmadi.\n\nBoshqa razmer yozing (masalan 42, 46)"
                 )
                 return  # 🔥 MUHIM — step o‘chmaydi
 
-            # 🔥 FAqat topilganda tozalaymiz
-            context.user_data.clear()
+            context.user_data["filtered"] = filtered
+            context.user_data["i"] = 0
+            context.user_data.pop("step", None)
+
+            p = filtered[0]
+            photo = p.get("photo")
+
+            keyboard = [
+                [
+                    InlineKeyboardButton("⬅️", callback_data="prev_one"),
+                    InlineKeyboardButton("➡️", callback_data="next_one")
+                ],
+                [InlineKeyboardButton("🛒 Savatga qo‘shish", callback_data=f"add_{p.get('id')}")]
+            ]
+
+            if photo:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=f"1/{len(filtered)}\n\n{p.get('name')}\n📏 {p.get('size')} sm\n💰 {p.get('price')}",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                await update.message.reply_text(
+                    f"1/{len(filtered)}\n\n{p.get('name')}\n📏 {p.get('size')} sm\n💰 {p.get('price')}\n\n⚠️ Rasm yo‘q",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
         elif text == "🏠 Bosh menyu":
             context.user_data.clear()
             load_products_from_db()  # 🔥 xavfsizlik uchun qayta yuklaymiz
