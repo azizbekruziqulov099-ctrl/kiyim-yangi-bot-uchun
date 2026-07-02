@@ -784,6 +784,15 @@ async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> t
             None
         )
 
+    # Qaysi bozordan olinadi
+    if fuzzy_contains(q, ["bozor", "bozordan", "qayerdan olasiz", "qayerdan keltirasiz", "qayerdan sotib"]):
+        return (
+            "🛍 Mahsulotlarimizni asosan Urgut bozoridan, ba'zida esa Toshkentdan olib kelamiz.\n\n"
+            "Barcha kiyimlar sifat nazoratidan o'tkaziladi va faqat ishonchli yetkazib beruvchilardan sotib olinadi.",
+            True,
+            None
+        )
+
     # Aloqa / bog'lanish
     if fuzzy_contains(q, ["aloqa", "bog'lanish", "boglanish", "telefon", "raqam", "murojaat", "gaplashish"]):
         return (
@@ -1040,13 +1049,21 @@ async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> t
                 return (text, True, matches)
             return (f"❌ Hozircha {keywords[0]} yo'q.", True, None)
 
-    # Umumiy holat: nechta mahsulot bor
+    # Umumiy holat: nechta mahsulot bor / nima bor
     if fuzzy_contains(q, ["nechta", "qancha", "bor", "mavjud", "bormi"]):
-        names = set(p['name'] for p in available_products)
+        categories = sorted(set(p.get("category", "") for p in available_products if p.get("category")))
+        origins = sorted(set(p.get("origin", "") for p in available_products if p.get("origin")))
+
+        cat_text = ", ".join(c.capitalize() for c in categories) if categories else "turli xil"
+        origin_text = ", ".join(origins) if origins else "turli fabrikalar"
+
         return (
-            f"📦 Hozirda do'konda {len(names)} xil mahsulot mavjud, "
-            f"jami {len(available_products)} ta razmer variantida.\n\n"
-            f"🛍 Kiyimlarni qidirish orqali to'liq ko'rishingiz mumkin!",
+            f"📦 Do'konimizda bir qancha turdagi bolalar kiyimlari mavjud!\n\n"
+            f"👕 Turlari: {cat_text}\n"
+            f"🏭 Fabrikalar: {origin_text}\n\n"
+            f"Qaysi jins uchun (o'g'il/qiz), qaysi kategoriya yoki qaysi razmer kerakligini "
+            f"aytsangiz, aniq mahsulotlarni ko'rsataman!\n\n"
+            f"Yoki 🛍 Kiyimlarni qidirish orqali to'liq katalogni ko'rishingiz mumkin!",
             True,
             None
         )
@@ -1962,16 +1979,23 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif text == "🤖 AI Yordamchi":
             context.user_data["ai_mode"] = True
-            await update.message.reply_text(
+            intro_text = (
                 "🤖 AI Yordamchi\n\n"
                 "Menga mahsulotlar haqida savol bering, masalan:\n"
                 "• 34 razmerda futbolka bormi?\n"
                 "• Eng arzon narx qancha?\n"
                 "• Qizlar uchun nima bor?\n"
                 "• Xitoy fabrikasidan nima bor?\n\n"
-                "Yozing 👇",
+                "Yozing 👇"
+            )
+            await update.message.reply_text(
+                intro_text,
                 reply_markup=ReplyKeyboardMarkup([["🏠 Bosh menyu"]], resize_keyboard=True)
             )
+            try:
+                await send_voice_message(update, context, "Assalomu alaykum! Men AI yordamchiman. Menga mahsulotlar haqida savol bering.")
+            except Exception as e:
+                print("AI intro TTS XATO:", e)
 
         elif context.user_data.get("ai_mode"):
             answer, found, matches = await ai_assistant_answer(text, update.effective_user.id, context.bot)
