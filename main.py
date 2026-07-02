@@ -444,23 +444,37 @@ def load_products_from_db():
             "count": r[9],
             "reserved": r[10]
         })
-async def send_voice_message(update, context, text):
-    """Matnni ovozga aylantirib yuboradi (gTTS orqali)"""
+async def send_voice_bytes(text: str):
+    """Matnni ovoz baytlariga aylantiradi (gTTS, ayol ovozi - rus tilida yaqinroq talaffuz)"""
     from gtts import gTTS
     import tempfile
 
-    tts = gTTS(text=text, lang='uz' if False else 'ru')  # uz yo'q, ru yaqinroq talaffuz beradi
+    tts = gTTS(text=text, lang='ru')
     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
         tts.save(f.name)
         path = f.name
 
     with open(path, "rb") as audio:
-        await update.message.reply_voice(voice=audio)
+        data = audio.read()
 
     try:
         os.remove(path)
     except Exception:
         pass
+
+    return data
+
+
+async def send_voice_message(update, context, text):
+    """Matnni ovozga aylantirib, joriy update.message ga javob sifatida yuboradi"""
+    data = await send_voice_bytes(text)
+    await update.message.reply_voice(voice=io.BytesIO(data))
+
+
+async def send_voice_to_chat(bot, chat_id, text):
+    """Matnni ovozga aylantirib, berilgan chat_id ga yuboradi"""
+    data = await send_voice_bytes(text)
+    await bot.send_voice(chat_id=chat_id, voice=io.BytesIO(data))
 
 
 def levenshtein(a, b):
@@ -574,7 +588,7 @@ def extract_age_from_text(text: str):
 
 
 async def send_products_album(bot, chat_id, matched_products, title=""):
-    """Topilgan mahsulotlarni rasm albomi + tugmalar bilan yuboradi"""
+    """Topilgan mahsulotlarni rasm albomi + to'liq ma'lumot va tugmalar bilan yuboradi"""
     if not matched_products:
         return
 
@@ -587,19 +601,19 @@ async def send_products_album(bot, chat_id, matched_products, title=""):
     if with_photo:
         media = []
         for i, p in enumerate(with_photo):
-            caption = f"{i+1}) {p['name']}\n📏 {p['size']}sm  💰 {p['price']}"
+            caption = f"{i+1}) {p['size']}sm"
             media.append(InputMediaPhoto(media=p["photo"], caption=caption))
         try:
             await bot.send_media_group(chat_id=chat_id, media=media)
         except Exception as e:
             print("Album xato:", e)
 
-    # Har biriga alohida "Savatga qo'shish" tugmasi
-    for p in with_photo:
+    # Har biriga to'liq ma'lumot + "Savatga qo'shish" tugmasi
+    for i, p in enumerate(with_photo):
         try:
             await bot.send_message(
                 chat_id=chat_id,
-                text=f"👆 {p['name']} — {p['size']}sm",
+                text=f"{i+1}) {p['name']}\n📏 {p['size']} sm\n💰 {p['price']}",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("🛒 Savatga qo'shish", callback_data=f"add_{p['id']}")
                 ]])
@@ -861,9 +875,11 @@ async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> t
                 text=(
                     f"🆕 Yangi savol (botim javob berolmadi):\n\n"
                     f"👤 User ID: {user_id}\n"
-                    f"❓ Savol: {question}\n\n"
-                    f"Javob berish uchun: /javob {q_id} Sizning javobingiz"
-                )
+                    f"❓ Savol: {question}"
+                ),
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("✍️ Javob yozish", callback_data=f"answer_q_{q_id}")
+                ]])
             )
         except Exception as e:
             print("Admin xabar xato:", e)
@@ -1320,6 +1336,54 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         get_connection()  # 🔥 DB ulanish tekshiruvi
 
         text = update.message.text
+
+        # ===== ADMIN: SAVOLGA JAVOB YOZISH =====
+        if context.user_data.get("answering_q_id") and update.effective_user.id == ADMIN_ID:
+            q_id = context.user_data.pop("answering_q_id")
+
+            cur.execute("SELECT user_id, question, status FROM shop_pending_questions WHERE id=%s", (q_id,))
+            row = cur.fetchone()
+
+            if not row:
+                await update.message.reply_text(f"❌ #{q_id} raqamli savol topilmadi")
+                return
+
+            target_user_id, question, status = row
+
+            if status == "answered":
+                await update.message.reply_text("⚠️ Bu savolga allaqachon javob berilgan")
+                return
+
+            answer_text = text
+
+            # Bilim bazasiga saqlaymiz — bot buni eslab qoladi
+            cur.execute(
+                "INSERT INTO shop_learned_answers (question, answer, created_at) VALUES (%s, %s, %s)",
+                (question, answer_text, time.time())
+            )
+            cur.execute(
+                "UPDATE shop_pending_questions SET status='answered' WHERE id=%s",
+                (q_id,)
+            )
+            conn.commit()
+
+            # Foydalanuvchiga matn + ovoz yuboramiz
+            try:
+                await context.bot.send_message(
+                    chat_id=target_user_id,
+                    text=f"💬 Savolingizga javob:\n\n{answer_text}"
+                )
+                await send_voice_to_chat(context.bot, target_user_id, answer_text)
+            except Exception as e:
+                await update.message.reply_text(f"⚠️ Foydalanuvchiga yuborilmadi: {e}")
+
+            await update.message.reply_text(
+                f"✅ Javob saqlandi va yuborildi!\n\n"
+                f"❓ Savol: {question}\n"
+                f"💬 Javob: {answer_text}\n\n"
+                f"Endi shunga o'xshash savol kelsa, bot avtomatik shu javobni beradi."
+            )
+            return
 
         # ===== ADMIN INLINE STEPS =====
         adm_step = context.user_data.get("adm_step")
@@ -2530,6 +2594,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = query.from_user.id
     data = query.data
+
+    if data.startswith("answer_q_"):
+        q_id = int(data.replace("answer_q_", ""))
+        cur.execute("SELECT question, status FROM shop_pending_questions WHERE id=%s", (q_id,))
+        row = cur.fetchone()
+        if not row:
+            await query.answer("❌ Savol topilmadi", show_alert=True)
+            return
+        question_text, status = row
+        if status == "answered":
+            await query.answer("⚠️ Bu savolga allaqachon javob berilgan", show_alert=True)
+            return
+
+        context.user_data["answering_q_id"] = q_id
+        await query.message.reply_text(
+            f"✍️ Savol:\n{question_text}\n\nJavobingizni yozing:"
+        )
+        return
 
 
 
@@ -3983,12 +4065,13 @@ async def javob_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     conn.commit()
 
-    # Foydalanuvchiga javob yuboramiz
+    # Foydalanuvchiga javob yuboramiz (matn + ovoz)
     try:
         await context.bot.send_message(
             chat_id=target_user_id,
             text=f"💬 Savolingizga javob:\n\n{answer_text}"
         )
+        await send_voice_to_chat(context.bot, target_user_id, answer_text)
     except Exception as e:
         await update.message.reply_text(f"⚠️ Foydalanuvchiga yuborilmadi: {e}")
 
