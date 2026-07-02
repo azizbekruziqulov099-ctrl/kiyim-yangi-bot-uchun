@@ -140,6 +140,7 @@ def admin_main_kb():
         ],
         [
             InlineKeyboardButton("❓ Javobsiz savollar", callback_data="adm_pending_q_0"),
+            InlineKeyboardButton("✅ Javob berilganlar", callback_data="adm_answered_q_0"),
         ],
     ])
 
@@ -627,24 +628,23 @@ async def save_pending_question(user_id: int, question: str):
 
 
 AGE_TO_SIZE = [
-    (0, 0.25, "56"),
-    (0.25, 0.5, "62-68"),
-    (0.5, 1, "74-80"),
-    (1, 2, "86-92"),
-    (2, 3, "92-98"),
-    (3, 4, "98-104"),
-    (4, 5, "104-110"),
-    (5, 6, "110-116"),
-    (6, 7, "116-122"),
-    (7, 8, "122-128"),
-    (8, 9, "128-134"),
-    (9, 10, "134-140"),
-    (10, 12, "140-152"),
+    (0, 0.5, "24-26"),
+    (0.5, 1, "27-29"),
+    (1, 2, "30-33"),
+    (2, 3, "34-36"),
+    (3, 4, "37-39"),
+    (4, 5, "40-42"),
+    (5, 6, "43-45"),
+    (6, 7, "46-48"),
+    (7, 8, "49-51"),
+    (8, 9, "52-54"),
+    (9, 10, "55-58"),
+    (10, 12, "59-64"),
 ]
 
 
 def age_to_size_range(age_years: float):
-    """Yoshni O'rta Osiyo standart razmer oralig'iga aylantiradi"""
+    """Yoshni taxminiy kiyim uzunligi (futbolka/ko'ylak, sm) oralig'iga aylantiradi"""
     for lo, hi, size_range in AGE_TO_SIZE:
         if lo <= age_years < hi:
             return size_range
@@ -655,6 +655,45 @@ def extract_age_from_text(text: str):
     """Matndan yosh raqamini topadi (masalan '5 yosh', '5 yoshli', '5 yoshga')"""
     import re
     m = re.search(r'(\d+)\s*(yosh|yoshli|yoshga|yoshda)', text.lower())
+    if m:
+        return int(m.group(1))
+    return None
+
+
+# Bola bo'yi (sm) -> taxminiy kiyim uzunligi (sm)
+HEIGHT_TO_GARMENT = [
+    (0, 62, "24-26"),
+    (62, 74, "27-29"),
+    (74, 86, "30-33"),
+    (86, 98, "34-36"),
+    (98, 104, "37-39"),
+    (104, 110, "40-42"),
+    (110, 116, "43-45"),
+    (116, 122, "46-48"),
+    (122, 128, "49-51"),
+    (128, 134, "52-54"),
+    (134, 140, "55-58"),
+    (140, 152, "59-64"),
+]
+
+
+def height_to_garment_length(height_cm: int) -> str:
+    """Bola bo'yini taxminiy kiyim uzunligi oralig'iga aylantiradi"""
+    for lo, hi, garment_range in HEIGHT_TO_GARMENT:
+        if lo <= height_cm < hi:
+            return garment_range
+    return "59-64"
+
+
+def extract_height_from_text(text: str):
+    """Matndan bola bo'yini topadi (masalan 'bo'yi 100 sm', 'boyi 105', '100 santimetr bo'yli')"""
+    import re
+    t = text.lower()
+    # "bo'y(i) 100" yoki "100 sm bo'y"
+    m = re.search(r"bo[\'`]?y[i]?\s*(\d{2,3})", t)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"(\d{2,3})\s*(sm|santimetr)?\s*bo[\'`]?y", t)
     if m:
         return int(m.group(1))
     return None
@@ -874,13 +913,57 @@ async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> t
             gender_txt = "bolalar"
 
         text = (
-            f"👶 {age} yoshli {gender_txt} uchun taxminan {size_range} sm razmer mos keladi.\n\n"
-            f"⚠️ Bolalar bo'yi turlicha bo'lishi mumkin — aniqroq natija uchun "
-            f"kiyim uzunligini santimetrda o'lchab, aniq raqamni yozing (masalan: \"106 sm\").\n\n"
+            f"👶 {age} yoshli {gender_txt} uchun taxminan {size_range} sm kiyim uzunligi mos keladi.\n\n"
+            f"⚠️ Bu taxminiy! Bolalar bo'yi turlicha bo'lgani uchun aniq natija uchun "
+            f"farzandingizning eski kiyimini (futbolka yoki ko'ylagini) yelka chetidan "
+            f"pastki uchigacha o'lchab, aniq santimetrni yozing (masalan: \"38 sm\").\n\n"
         )
         if age_matches:
             text += f"📦 Hozircha {len(age_matches)} ta mos mahsulot topildi, rasmlarini yubormoqdaman:"
             return (text, True, age_matches)
+        else:
+            text += "❌ Hozircha shu oraliqda mahsulot yo'q."
+            return (text, True, None)
+
+    # 🔥 Bola bo'yi so'ralganda — kiyim uzunligiga taxminiy aylantiramiz
+    height = extract_height_from_text(question)
+    if height is not None:
+        garment_range = height_to_garment_length(height)
+        lo_s, hi_s = (garment_range.split("-") if "-" in garment_range else (garment_range, garment_range))
+        lo_s, hi_s = int(lo_s), int(hi_s)
+
+        height_matches = []
+        for p in available_products:
+            raw = norm(p.get("size")).replace("sm", "").strip()
+            if "-" in raw:
+                parts = raw.split("-")
+                if len(parts) >= 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                    p_lo, p_hi = int(parts[0]), int(parts[1])
+                    if not (p_hi < lo_s or p_lo > hi_s):
+                        height_matches.append(p)
+            elif raw.isdigit():
+                p_size = int(raw)
+                if lo_s <= p_size <= hi_s:
+                    height_matches.append(p)
+
+        if fuzzy_contains(q, ["qiz", "qizga", "qizlarga"]):
+            height_matches = [p for p in height_matches if "qiz" in norm(p.get("gender"))]
+            gender_txt = "qizlar"
+        elif fuzzy_contains(q, ["ogil", "bola"]):
+            height_matches = [p for p in height_matches if "ogil" in norm(p.get("gender"))]
+            gender_txt = "o'g'il bolalar"
+        else:
+            gender_txt = "bolalar"
+
+        text = (
+            f"📏 Bo'yi {height} sm bo'lgan {gender_txt} uchun taxminan {garment_range} sm kiyim uzunligi mos keladi.\n\n"
+            f"⚠️ Bu taxminiy! Aniq natija uchun farzandingizning eski kiyimini "
+            f"(futbolka yoki ko'ylagini) yelka chetidan pastki uchigacha o'lchab, "
+            f"aniq santimetrni yozing (masalan: \"38 sm\").\n\n"
+        )
+        if height_matches:
+            text += f"📦 Hozircha {len(height_matches)} ta mos mahsulot topildi, rasmlarini yubormoqdaman:"
+            return (text, True, height_matches)
         else:
             text += "❌ Hozircha shu oraliqda mahsulot yo'q."
             return (text, True, None)
@@ -1497,6 +1580,40 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"❓ Savol: {question}\n"
                 f"💬 Javob: {answer_text}\n\n"
                 f"Endi shunga o'xshash savol kelsa, bot avtomatik shu javobni beradi."
+            )
+            return
+
+        # ===== ADMIN: MAVJUD JAVOBNI TAHRIRLASH =====
+        if context.user_data.get("editing_q_id") and update.effective_user.id == ADMIN_ID:
+            q_id = context.user_data.pop("editing_q_id")
+
+            cur.execute("SELECT question FROM shop_pending_questions WHERE id=%s", (q_id,))
+            row = cur.fetchone()
+
+            if not row:
+                await update.message.reply_text(f"❌ #{q_id} raqamli savol topilmadi")
+                return
+
+            question = row[0]
+            new_answer = text
+
+            # Eski javobni yangilaymiz (yangi qo'shmaymiz)
+            cur.execute(
+                "UPDATE shop_learned_answers SET answer=%s, created_at=%s WHERE question=%s",
+                (new_answer, time.time(), question)
+            )
+            if cur.rowcount == 0:
+                # Agar hech qanday yozuv yangilanmagan bo'lsa — yangi qo'shamiz
+                cur.execute(
+                    "INSERT INTO shop_learned_answers (question, answer, created_at) VALUES (%s, %s, %s)",
+                    (question, new_answer, time.time())
+                )
+            conn.commit()
+
+            await update.message.reply_text(
+                f"✅ Javob yangilandi!\n\n"
+                f"❓ Savol: {question}\n"
+                f"💬 Yangi javob: {new_answer}"
             )
             return
 
@@ -2767,6 +2884,74 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kb.append([InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")])
 
         await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
+        return
+
+    if data.startswith("adm_answered_q_"):
+        page = int(data.replace("adm_answered_q_", ""))
+        offset = page * 5
+
+        cur.execute(
+            """
+            SELECT pq.id, pq.question, la.answer, la.id as answer_id
+            FROM shop_pending_questions pq
+            LEFT JOIN shop_learned_answers la ON la.question = pq.question
+            WHERE pq.status = 'answered'
+            ORDER BY pq.id DESC LIMIT 5 OFFSET %s
+            """,
+            (offset,)
+        )
+        rows = cur.fetchall()
+        cur.execute("SELECT COUNT(*) FROM shop_pending_questions WHERE status='answered'")
+        total = cur.fetchone()[0]
+
+        if not rows:
+            await query.message.edit_text(
+                "📭 Hali javob berilgan savol yo'q.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")]
+                ])
+            )
+            return
+
+        kb = []
+        text = f"✅ Javob berilgan savollar ({total} ta):\n\n"
+        for q_id, question, answer, answer_id in rows:
+            short_q = question[:35] + ("..." if len(question) > 35 else "")
+            short_a = (answer[:35] + "..." if answer and len(answer) > 35 else (answer or "—"))
+            text += f"🆔{q_id}: {short_q}\n💬 {short_a}\n\n"
+            kb.append([InlineKeyboardButton(f"✏️ #{q_id} tahrirlash", callback_data=f"edit_answer_{q_id}")])
+
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton("⬅️", callback_data=f"adm_answered_q_{page-1}"))
+        if offset + 5 < total:
+            nav.append(InlineKeyboardButton("➡️", callback_data=f"adm_answered_q_{page+1}"))
+        if nav:
+            kb.append(nav)
+        kb.append([InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")])
+
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
+        return
+
+    if data.startswith("edit_answer_"):
+        q_id = int(data.replace("edit_answer_", ""))
+        cur.execute("SELECT question FROM shop_pending_questions WHERE id=%s", (q_id,))
+        row = cur.fetchone()
+        if not row:
+            await query.answer("❌ Topilmadi", show_alert=True)
+            return
+        question_text = row[0]
+
+        cur.execute("SELECT answer FROM shop_learned_answers WHERE question=%s ORDER BY id DESC LIMIT 1", (question_text,))
+        ans_row = cur.fetchone()
+        current_answer = ans_row[0] if ans_row else "—"
+
+        context.user_data["editing_q_id"] = q_id
+        await query.message.reply_text(
+            f"✏️ Savol:\n{question_text}\n\n"
+            f"Joriy javob:\n{current_answer}\n\n"
+            f"Yangi javobni yozing:"
+        )
         return
 
 
