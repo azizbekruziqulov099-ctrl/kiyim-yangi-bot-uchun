@@ -14,6 +14,20 @@ from telegram import InputMediaPhoto
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+def get_connection():
+    """DB ulanishini tekshiradi, uzilgan bo'lsa qayta ulaydi"""
+    global conn, cur
+    try:
+        cur.execute("SELECT 1")
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+    return conn, cur
+
 conn = psycopg2.connect(DATABASE_URL)
 cur = conn.cursor()   # 🔥 SHU MUHIM
 cur.execute("""
@@ -380,6 +394,7 @@ def clean_cart(user_id, context=None):
 
 def load_products_from_db():
     global products
+    get_connection()  # 🔥 ulanish tekshiruvi
 
     cur.execute("SELECT * FROM shop_products")
     rows = cur.fetchall()
@@ -848,6 +863,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if not update.message:
             return
+
+        get_connection()  # 🔥 DB ulanish tekshiruvi
 
         text = update.message.text
 
@@ -1520,7 +1537,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # ===== USER FLOW =====
         elif text == "🛍 Kiyimlar":
-            context.user_data.clear() 
+            context.user_data.clear()
+            load_products_from_db()  # 🔥 xavfsizlik uchun qayta yuklaymiz
             keyboard = [["👦 O‘g‘il", "👧 Qiz"],["🔙 Orqaga", "🏠 Bosh menyu"]]
             await update.message.reply_text("Tanlang:", reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
 
@@ -1986,6 +2004,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
         elif text == "🏠 Bosh menyu":
             context.user_data.clear()
+            load_products_from_db()  # 🔥 xavfsizlik uchun qayta yuklaymiz
 
             await update.message.reply_text(
                 "🏠 Bosh menyu",
@@ -2002,6 +2021,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     query = update.callback_query
     await query.answer()
+    get_connection()  # 🔥 DB ulanish tekshiruvi
 
     user_id = query.from_user.id
     data = query.data
