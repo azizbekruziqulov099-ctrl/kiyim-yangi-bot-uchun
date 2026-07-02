@@ -1783,15 +1783,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=ReplyKeyboardMarkup([["🏠 Bosh menyu"]], resize_keyboard=True)
             )
 
-        elif text == "🤖 Yana savol":
-            context.user_data["ai_mode"] = True
-            await update.message.reply_text("🤖 Savolingizni yozing:")
-
         elif context.user_data.get("ai_mode"):
             answer, found, matches = await ai_assistant_answer(text, update.effective_user.id, context.bot)
             await update.message.reply_text(
                 answer,
-                reply_markup=ReplyKeyboardMarkup([["🤖 Yana savol", "🏠 Bosh menyu"]], resize_keyboard=True)
+                reply_markup=ReplyKeyboardMarkup([["🛍 Kiyimlarni qidirish", "🏠 Bosh menyu"]], resize_keyboard=True)
             )
             if found:
                 try:
