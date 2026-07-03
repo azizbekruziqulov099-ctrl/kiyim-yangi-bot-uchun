@@ -1120,6 +1120,25 @@ async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> t
             None
         )
 
+    # 🔥 Mahsulot nomlarida qidiramiz (masalan "paxtali", "sport" kabi so'zlar)
+    q_keywords_search = extract_keywords(question)
+    if q_keywords_search:
+        name_matches = []
+        for p in available_products:
+            p_name_norm = norm(p.get("name", ""))
+            for kw in q_keywords_search:
+                if len(kw) >= 4 and word_match(kw, p_name_norm):
+                    name_matches.append(p)
+                    break
+                # nom ichida so'z borligini ham tekshiramiz (substring)
+                if len(kw) >= 4 and kw in p_name_norm:
+                    name_matches.append(p)
+                    break
+
+        if name_matches:
+            text = f"🔍 \"{question}\" bo'yicha {len(name_matches)} ta mahsulot topildi, rasmlarini yubormoqdaman:"
+            return (text, True, name_matches)
+
     # 🔥 Avval savol mantiqiymi tekshiramiz
     if is_nonsense_question(question):
         return (
