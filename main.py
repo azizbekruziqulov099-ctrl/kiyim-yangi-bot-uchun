@@ -1074,11 +1074,32 @@ async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> t
     ]
     for keywords, cat_db in category_map:
         if fuzzy_contains(q, keywords):
+            # Agar butun savol shu bitta so'zdan iborat bo'lsa va qisqa bo'lsa — noaniq bo'lishi mumkin
+            q_words = q.split()
+            if len(q_words) <= 1 and len(q) <= 4:
+                matches = [p for p in available_products if cat_db in norm(p.get("category"))]
+                if matches:
+                    return (
+                        f"🤔 \"{keywords[0].capitalize()}\" kategoriyasini nazarda tutdingizmi?\n\n"
+                        f"Ha bo'lsa \"ha\" deb yozing, men mahsulotlarni ko'rsataman.",
+                        True,
+                        None
+                    )
+                continue
+
             matches = [p for p in available_products if cat_db in norm(p.get("category"))]
             if matches:
                 text = f"👕 {keywords[0].capitalize()} — {len(matches)} ta mahsulot topildi, rasmlarini yubormoqdaman:"
                 return (text, True, matches)
             return (f"❌ Hozircha {keywords[0]} yo'q.", True, None)
+
+    # "Ha" javobi — oldingi tasdiqni tekshiramiz (oddiy holat: oxirgi savol kategoriya bo'lgan)
+    if q in ("ha", "xa", "ha.", "mayli", "tugri", "to'g'ri"):
+        return (
+            "😊 Aniqroq bo'lishi uchun to'liq yozib bering, masalan: \"futbolka bormi?\" yoki \"bosh kiyim bormi?\"",
+            True,
+            None
+        )
 
     # Umumiy holat: nechta mahsulot bor / nima bor
     if fuzzy_contains(q, ["nechta", "qancha", "bor", "mavjud", "bormi"]):
@@ -2028,7 +2049,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 print("AI intro TTS XATO:", e)
 
-        elif context.user_data.get("ai_mode"):
+        elif context.user_data.get("ai_mode") and text not in ("🏠 Bosh menyu", "🛍 Kiyimlarni qidirish", "🧺 Savat", "ℹ️ Yordam", "🤖 AI Yordamchi"):
             answer, found, matches = await ai_assistant_answer(text, update.effective_user.id, context.bot)
             await update.message.reply_text(
                 answer,
