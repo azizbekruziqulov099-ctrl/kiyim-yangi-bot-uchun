@@ -717,42 +717,47 @@ def extract_height_from_text(text: str):
     return None
 
 
-async def send_products_album(bot, chat_id, matched_products, title=""):
-    """Topilgan mahsulotlarni har birini rasm + to'liq ma'lumot + tugma bilan yuboradi"""
+async def send_products_album(bot, chat_id, matched_products, title="", context=None):
+    """Topilgan mahsulotlarni bittalab, oldinga/orqaga o'tkazib ko'rsatadi"""
     if not matched_products:
         return
 
     if title:
         await bot.send_message(chat_id=chat_id, text=title)
 
-    # 10 tadan ko'p bo'lmasin (spam bo'lmasligi uchun)
-    shown = matched_products[:10]
+    shown = matched_products[:30]  # ichki chegara, lekin navigatsiya bilan ko'riladi
 
-    for i, p in enumerate(shown):
-        caption = f"{i+1}) {p['name']}\n📏 {p['size']} sm\n💰 {p['price']}"
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("🛒 Savatga qo'shish", callback_data=f"add_{p['id']}")
-        ]])
-        try:
-            if p.get("photo"):
-                await bot.send_photo(
-                    chat_id=chat_id,
-                    photo=p["photo"],
-                    caption=caption,
-                    reply_markup=keyboard
-                )
-            else:
-                await bot.send_message(
-                    chat_id=chat_id,
-                    text=caption + "\n\n⚠️ Rasm yo'q",
-                    reply_markup=keyboard
-                )
-        except Exception as e:
-            print("Mahsulot yuborish xato:", e)
+    if context is not None:
+        context.user_data["filtered"] = shown
+        context.user_data["i"] = 0
 
-    if len(matched_products) > len(shown):
-        remaining = len(matched_products) - len(shown)
-        await bot.send_message(chat_id=chat_id, text=f"...va yana {remaining} ta mahsulot bor")
+    p = shown[0]
+    caption = f"1/{len(shown)}\n\n{p['name']}\n📏 {p['size']} sm\n💰 {p['price']}"
+
+    keyboard = []
+    nav = []
+    if len(shown) > 1:
+        nav.append(InlineKeyboardButton("➡️", callback_data="next_one"))
+    if nav:
+        keyboard.append(nav)
+    keyboard.append([InlineKeyboardButton("🛒 Savatga qo'shish", callback_data=f"add_{p['id']}")])
+
+    try:
+        if p.get("photo"):
+            await bot.send_photo(
+                chat_id=chat_id,
+                photo=p["photo"],
+                caption=caption,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        else:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=caption + "\n\n⚠️ Rasm yo'q",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+    except Exception as e:
+        print("Mahsulot yuborish xato:", e)
 
 
 async def ai_assistant_answer(question: str, user_id: int = None, bot=None) -> tuple:
@@ -2080,7 +2085,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     print("AI TTS XATO:", e)
             if matches:
-                await send_products_album(context.bot, update.effective_chat.id, matches)
+                await send_products_album(context.bot, update.effective_chat.id, matches, context=context)
 
         elif context.user_data.get("step") == "size_season" and text in ["☀️ Yozgi","❄️ Qishki","🌸 Bahor","🍂 Kuz"]:
             season = text.replace("☀️ ", "").replace("❄️ ", "").replace("🌸 ", "").replace("🍂 ", "")
@@ -3670,14 +3675,36 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         from telegram import InputMediaPhoto
 
-        await query.message.edit_media(
-            media=InputMediaPhoto(
-                media=p.get("photo"),
-                caption=f"{context.user_data['i']+1}/{len(context.user_data['filtered'])}\n\n"
-                        f"{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}"
-            ),
-            reply_markup=InlineKeyboardMarkup(keyboard)
+        caption_text = (
+            f"{context.user_data['i']+1}/{len(context.user_data['filtered'])}\n\n"
+            f"{p.get('name')}\n📏 {p.get('size')}\n💰 {p.get('price')}"
         )
+
+        try:
+            if p.get("photo"):
+                await query.message.edit_media(
+                    media=InputMediaPhoto(media=p.get("photo"), caption=caption_text),
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                await query.message.edit_caption(
+                    caption=caption_text + "\n\n⚠️ Rasm yo'q",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+        except Exception as e:
+            # Agar edit_media ishlamasa (masalan rasmli->rasmsiz o'tishda), yangi xabar yuboramiz
+            print("Nav xato:", e)
+            if p.get("photo"):
+                await query.message.reply_photo(
+                    photo=p.get("photo"),
+                    caption=caption_text,
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                await query.message.reply_text(
+                    caption_text + "\n\n⚠️ Rasm yo'q",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
 
     elif data.startswith("plus_"):
         product_id = int(data.split("_")[1])
