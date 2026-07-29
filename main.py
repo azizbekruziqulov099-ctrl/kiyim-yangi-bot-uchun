@@ -98,6 +98,32 @@ CREATE TABLE IF NOT EXISTS shop_sold_products (
 conn.commit()
 
 cur.execute("""
+CREATE TABLE IF NOT EXISTS shop_pickup_points (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    phone TEXT,
+    active INTEGER DEFAULT 1,
+    created_at FLOAT
+)
+""")
+conn.commit()
+
+# Boshlang'ich punkt — agar jadval bo'sh bo'lsa, avvalgi manzilni qo'shamiz
+cur.execute("SELECT COUNT(*) FROM shop_pickup_points")
+if cur.fetchone()[0] == 0:
+    cur.execute("""
+        INSERT INTO shop_pickup_points (name, address, phone, active, created_at)
+        VALUES (%s, %s, %s, 1, %s)
+    """, (
+        "Asosiy filial",
+        "Samarqand, Pastdarg'om, Charxin",
+        "+998915388499",
+        time.time()
+    ))
+    conn.commit()
+
+cur.execute("""
 ALTER TABLE shop_products ADD COLUMN IF NOT EXISTS cost INTEGER DEFAULT 0
 """)
 conn.commit()
@@ -159,6 +185,7 @@ def admin_main_kb():
         ],
         [
             InlineKeyboardButton("💰 Sotilganlar", callback_data="adm_sold_0"),
+            InlineKeyboardButton("📍 Olib ketish punktlari", callback_data="adm_pickup_0"),
         ],
     ])
 
@@ -1713,6 +1740,68 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ===== ADMIN INLINE STEPS =====
         adm_step = context.user_data.get("adm_step")
 
+        if adm_step == "pickup_add_name":
+            context.user_data["new_pickup"]["name"] = text
+            context.user_data["adm_step"] = "pickup_add_address"
+            await update.message.reply_text("📌 Manzilini yozing:")
+            return
+
+        if adm_step == "pickup_add_address":
+            context.user_data["new_pickup"]["address"] = text
+            context.user_data["adm_step"] = "pickup_add_phone"
+            await update.message.reply_text("☎️ Telefon raqamini yozing (yoki \"-\" agar kerak bo'lmasa):")
+            return
+
+        if adm_step == "pickup_add_phone":
+            phone = None if text.strip() == "-" else text.strip()
+            np = context.user_data.get("new_pickup", {})
+            cur.execute(
+                "INSERT INTO shop_pickup_points (name, address, phone, active, created_at) VALUES (%s, %s, %s, 1, %s)",
+                (np.get("name", ""), np.get("address", ""), phone, time.time())
+            )
+            conn.commit()
+            context.user_data.pop("adm_step", None)
+            context.user_data.pop("new_pickup", None)
+            await update.message.reply_text(
+                f"✅ Yangi punkt qo'shildi!\n\n📍 {np.get('name')}\n📌 {np.get('address')}\n☎️ {phone or '—'}",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📍 Punktlar ro'yxati", callback_data="adm_pickup_0")]
+                ])
+            )
+            return
+
+        if adm_step == "pickup_edit_name":
+            context.user_data["new_pickup"]["name"] = text
+            context.user_data["adm_step"] = "pickup_edit_address"
+            await update.message.reply_text("📌 Yangi manzilni yozing:")
+            return
+
+        if adm_step == "pickup_edit_address":
+            context.user_data["new_pickup"]["address"] = text
+            context.user_data["adm_step"] = "pickup_edit_phone"
+            await update.message.reply_text("☎️ Yangi telefon raqamini yozing (yoki \"-\"):")
+            return
+
+        if adm_step == "pickup_edit_phone":
+            phone = None if text.strip() == "-" else text.strip()
+            np = context.user_data.get("new_pickup", {})
+            pid = context.user_data.pop("editing_pickup_id", None)
+            if pid:
+                cur.execute(
+                    "UPDATE shop_pickup_points SET name=%s, address=%s, phone=%s WHERE id=%s",
+                    (np.get("name", ""), np.get("address", ""), phone, pid)
+                )
+                conn.commit()
+            context.user_data.pop("adm_step", None)
+            context.user_data.pop("new_pickup", None)
+            await update.message.reply_text(
+                f"✅ Punkt yangilandi!\n\n📍 {np.get('name')}\n📌 {np.get('address')}\n☎️ {phone or '—'}",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📍 Punktlar ro'yxati", callback_data="adm_pickup_0")]
+                ])
+            )
+            return
+
         if adm_step == "broadcast":
             cur.execute("SELECT user_id FROM shop_users")
             users = cur.fetchall()
@@ -2073,7 +2162,16 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 print("AI intro TTS XATO:", e)
 
-        elif context.user_data.get("ai_mode") and text not in ("🏠 Bosh menyu", "🛍 Kiyimlarni qidirish", "🧺 Savat", "ℹ️ Yordam", "🤖 AI Yordamchi"):
+        elif (
+            context.user_data.get("ai_mode")
+            and not context.user_data.get("order_step")
+            and not context.user_data.get("step")
+            and text not in (
+                "🏠 Bosh menyu", "🛍 Kiyimlarni qidirish", "🧺 Savat", "ℹ️ Yordam",
+                "🤖 AI Yordamchi", "🚚 Dastavka", "📍 Olib ketish", "🚚 Buyurtma berish",
+                "❌ Lokatsiya ishlamayapti", "📞 Telefon yuborish", "📞 Telefon yuboring:"
+            )
+        ):
             answer, found, matches = await ai_assistant_answer(text, update.effective_user.id, context.bot)
             await update.message.reply_text(
                 answer,
@@ -2737,9 +2835,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=MAIN_MENU
                 )
             else:
+                pp = data.get("pickup_point")
+                if pp:
+                    pickup_text = f"📍 Olib ketish manzili:\n{pp['name']}\n{pp['address']}\nAdminlar o'zlari a'loqaga chiqishadi."
+                else:
+                    pickup_text = "📍 Olib ketish manzili adminlar tomonidan aytiladi.\nAdminlar o'zlari a'loqaga chiqishadi."
                 await update.message.reply_text(
-                    "📍 Olib ketish manzili:\nSamarqand, Pastdarg‘om, Charxin\nA'loqa 📞 +998915388499  Adminlar o'zlari a'loqaga chiqishadi va manzilni yetgazishadi. " 
-                    ,
+                    pickup_text,
                     reply_markup=MAIN_MENU
                 )
 
@@ -2792,8 +2894,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
 
         elif text == "📍 Olib ketish":
-            context.user_data["order_step"] = "phone"
-
             user_id = update.effective_user.id
             cart = carts.get(user_id, {})
 
@@ -2818,13 +2918,72 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "type": "pickup"
             }
 
+            # 🔥 Faol olib ketish punktlarini olamiz
+            cur.execute("SELECT id, name, address FROM shop_pickup_points WHERE active=1 ORDER BY id")
+            points = cur.fetchall()
+
+            if not points:
+                # Punkt yo'q bo'lsa — to'g'ridan telefon so'raymiz (eski xatti-harakat)
+                context.user_data["order_step"] = "phone"
+                keyboard = [
+                    [KeyboardButton("📞 Telefon yuborish", request_contact=True)],
+                    ["🏠 Bosh menyu"]
+                ]
+                await update.message.reply_text(
+                    "📞 Telefon raqamingizni yuboring yoki yozing:",
+                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                )
+            elif len(points) == 1:
+                # Faqat 1 ta punkt bo'lsa — avtomatik tanlaymiz
+                pid, pname, paddress = points[0]
+                context.user_data["temp_order"]["pickup_point"] = {"id": pid, "name": pname, "address": paddress}
+                context.user_data["order_step"] = "phone"
+                keyboard = [
+                    [KeyboardButton("📞 Telefon yuborish", request_contact=True)],
+                    ["🏠 Bosh menyu"]
+                ]
+                await update.message.reply_text(
+                    f"📍 Olib ketish manzili:\n{pname}\n{paddress}\n\n"
+                    f"📞 Telefon raqamingizni yuboring yoki yozing:",
+                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                )
+            else:
+                # Bir nechta punkt — tanlashni so'raymiz
+                context.user_data["order_step"] = "choose_pickup_point"
+                kb = []
+                for pid, pname, paddress in points:
+                    kb.append([f"{pname} — {paddress}"])
+                kb.append(["🏠 Bosh menyu"])
+                await update.message.reply_text(
+                    "📍 Qaysi punktdan olib ketasiz?",
+                    reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True)
+                )
+
+        elif context.user_data.get("order_step") == "choose_pickup_point":
+            cur.execute("SELECT id, name, address FROM shop_pickup_points WHERE active=1 ORDER BY id")
+            points = cur.fetchall()
+
+            selected = None
+            for pid, pname, paddress in points:
+                if text.startswith(pname):
+                    selected = (pid, pname, paddress)
+                    break
+
+            if not selected:
+                await update.message.reply_text("❌ Iltimos, ro'yxatdan tanlang")
+                return
+
+            pid, pname, paddress = selected
+            context.user_data["temp_order"]["pickup_point"] = {"id": pid, "name": pname, "address": paddress}
+            context.user_data["order_step"] = "phone"
+
             keyboard = [
                 [KeyboardButton("📞 Telefon yuborish", request_contact=True)],
                 ["🏠 Bosh menyu"]
             ]
-
             await update.message.reply_text(
-                "📞 Telefon raqamingizni yuboring yoki yozing:",
+                f"📍 Tanlangan manzil:\n{pname}\n{paddress}\n\n"
+                f"📞 Telefon raqamingizni yuboring yoki yozing:",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
 
@@ -3084,7 +3243,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
         return
 
-
+    if data.startswith("edit_answer_"):
         q_id = int(data.replace("edit_answer_", ""))
         cur.execute("SELECT question FROM shop_pending_questions WHERE id=%s", (q_id,))
         row = cur.fetchone()
@@ -3102,6 +3261,85 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✏️ Savol:\n{question_text}\n\n"
             f"Joriy javob:\n{current_answer}\n\n"
             f"Yangi javobni yozing:"
+        )
+        return
+
+    if data.startswith("adm_pickup_"):
+        page = int(data.replace("adm_pickup_", ""))
+        cur.execute("SELECT id, name, address, phone, active FROM shop_pickup_points ORDER BY id")
+        rows = cur.fetchall()
+
+        text = "📍 Olib ketish punktlari:\n\n"
+        kb = []
+        if not rows:
+            text += "Hozircha punkt qo'shilmagan."
+        for pid, name, address, phone, active in rows:
+            status = "✅ Faol" if active else "❌ O'chirilgan"
+            text += f"🆔{pid} {name} — {status}\n📌 {address}\n☎️ {phone or '—'}\n\n"
+            kb.append([
+                InlineKeyboardButton(f"✏️ #{pid} tahrirlash", callback_data=f"pickup_edit_{pid}"),
+                InlineKeyboardButton(
+                    "❌ O'chirish" if active else "✅ Yoqish",
+                    callback_data=f"pickup_toggle_{pid}"
+                ),
+            ])
+        kb.append([InlineKeyboardButton("➕ Yangi punkt qo'shish", callback_data="pickup_add")])
+        kb.append([InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")])
+
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
+        return
+
+    if data == "pickup_add":
+        context.user_data["adm_step"] = "pickup_add_name"
+        context.user_data["new_pickup"] = {}
+        await query.message.reply_text("📍 Yangi punkt nomini yozing (masalan: 2-filial):")
+        return
+
+    if data.startswith("pickup_toggle_"):
+        pid = int(data.replace("pickup_toggle_", ""))
+        cur.execute("SELECT active FROM shop_pickup_points WHERE id=%s", (pid,))
+        row = cur.fetchone()
+        if not row:
+            await query.answer("❌ Topilmadi", show_alert=True)
+            return
+        new_active = 0 if row[0] else 1
+        cur.execute("UPDATE shop_pickup_points SET active=%s WHERE id=%s", (new_active, pid))
+        conn.commit()
+        await query.answer("✅ Yangilandi")
+        # Ro'yxatni yangilab qayta ko'rsatamiz
+        cur.execute("SELECT id, name, address, phone, active FROM shop_pickup_points ORDER BY id")
+        rows = cur.fetchall()
+        text = "📍 Olib ketish punktlari:\n\n"
+        kb = []
+        for r_pid, name, address, phone, active in rows:
+            status = "✅ Faol" if active else "❌ O'chirilgan"
+            text += f"🆔{r_pid} {name} — {status}\n📌 {address}\n☎️ {phone or '—'}\n\n"
+            kb.append([
+                InlineKeyboardButton(f"✏️ #{r_pid} tahrirlash", callback_data=f"pickup_edit_{r_pid}"),
+                InlineKeyboardButton(
+                    "❌ O'chirish" if active else "✅ Yoqish",
+                    callback_data=f"pickup_toggle_{r_pid}"
+                ),
+            ])
+        kb.append([InlineKeyboardButton("➕ Yangi punkt qo'shish", callback_data="pickup_add")])
+        kb.append([InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")])
+        await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
+        return
+
+    if data.startswith("pickup_edit_"):
+        pid = int(data.replace("pickup_edit_", ""))
+        cur.execute("SELECT name, address, phone FROM shop_pickup_points WHERE id=%s", (pid,))
+        row = cur.fetchone()
+        if not row:
+            await query.answer("❌ Topilmadi", show_alert=True)
+            return
+        context.user_data["editing_pickup_id"] = pid
+        context.user_data["adm_step"] = "pickup_edit_name"
+        context.user_data["new_pickup"] = {}
+        await query.message.reply_text(
+            f"✏️ Punktni tahrirlash\n\n"
+            f"Joriy nom: {row[0]}\n"
+            f"Yangi nomni yozing (o'zgartirmasa ham xuddi shu nomni qayta yozing):"
         )
         return
 
@@ -4185,6 +4423,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         context.user_data["order_started"] = time.time()
         context.user_data["order_step"] = "choose_type"
+        context.user_data.pop("ai_mode", None)
 
         keyboard = [
             ["🚚 Dastavka", "📍 Olib ketish"],
@@ -4385,15 +4624,21 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=MAIN_MENU
         )
     else:
+        pp = data.get("pickup_point")
+        if pp:
+            pickup_addr_text = f"{pp['name']}\n{pp['address']}"
+        else:
+            pickup_addr_text = "Adminlar tomonidan aytiladi"
+
         text_admin = (
             f"📍 OLIB KETISH\n"
             f"📞 {phone}\n"
             f"💰 {data['total']}\n"
-            f"🏠 Samarqand, Pastdarg'om, Charxin\n"
+            f"🏠 {pickup_addr_text}\n"
         )
 
         await update.message.reply_text(
-            "📍 Olib ketish manzili:\nSamarqand, Pastdarg'om, Charxin\n A'loqa 📞 +998915388499  Adminlar o'zlari a'loqaga chiqishadi va manzilni yetgazishadi. "
+            f"📍 Olib ketish manzili:\n{pickup_addr_text}\n\nAdminlar o'zlari a'loqaga chiqishadi."
         )
 
         await update.message.reply_text(
