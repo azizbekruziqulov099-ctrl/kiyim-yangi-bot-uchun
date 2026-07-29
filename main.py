@@ -144,6 +144,11 @@ CREATE TABLE IF NOT EXISTS shop_orders (
 
 conn.commit()
 
+cur.execute("""
+ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS viewed INTEGER DEFAULT 0
+""")
+conn.commit()
+
 
 
 cur.execute("""
@@ -166,10 +171,19 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 # ═══════════════════════════════════════════
 
 def admin_main_kb():
+    try:
+        get_connection()
+        cur.execute("SELECT COUNT(*) FROM shop_orders WHERE viewed=0")
+        new_orders = cur.fetchone()[0]
+    except Exception:
+        new_orders = 0
+
+    orders_label = f"🛒 Buyurtmalar ({new_orders} yangi)" if new_orders else "🛒 Buyurtmalar"
+
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📦 Mahsulotlar", callback_data="adm_products"),
-            InlineKeyboardButton("🛒 Buyurtmalar", callback_data="adm_orders"),
+            InlineKeyboardButton(orders_label, callback_data="adm_orders"),
         ],
         [
             InlineKeyboardButton("📊 Statistika",  callback_data="adm_stats"),
@@ -2879,9 +2893,11 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # ===== ADMINGA UMUMIY INFO =====
             if data.get("type") == "delivery":
-                text_admin = f"🚚 DASTAVKA\n📞 {phone}\n💰 {data['total']}"
+                text_admin = f"🆕 YANGI BUYURTMA #{order_id}\n🚚 DASTAVKA\n📞 {phone}\n💰 {data['total']}"
             else:
-                text_admin = f"📍 OLIB KETISH\n📞 {phone}\n💰 {data['total']}"
+                pp = data.get("pickup_point")
+                pp_text = f"\n📍 {pp['name']}" if pp else ""
+                text_admin = f"🆕 YANGI BUYURTMA #{order_id}\n📍 OLIB KETISH{pp_text}\n📞 {phone}\n💰 {data['total']}"
 
             await context.bot.send_message(
                 chat_id=ADMIN_ID,
@@ -3361,7 +3377,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "adm_orders":
-        cur.execute("SELECT id, phone, total, status FROM shop_orders ORDER BY id DESC LIMIT 10")
+        cur.execute(
+            "SELECT id, phone, total, status, viewed FROM shop_orders ORDER BY viewed ASC, id DESC LIMIT 15"
+        )
         rows = cur.fetchall()
         if not rows:
             await query.message.edit_text(
@@ -3371,13 +3389,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ])
             )
             return
-        text = "🛒 So'nggi buyurtmalar:\n\n"
+
+        cur.execute("SELECT COUNT(*) FROM shop_orders WHERE viewed=0")
+        new_count = cur.fetchone()[0]
+
+        text = f"🛒 Buyurtmalar"
+        if new_count:
+            text += f"\n🆕 {new_count} ta yangi (o'qilmagan)"
+        text += "\n\n"
+
         kb = []
         for r in rows:
-            text += f"🆔 {r[0]} | 📞 {r[1]} | 💰 {r[2]} | {r[3]}\n"
+            order_id, phone, total, status, viewed = r
+            badge = "🆕 " if not viewed else "✅ "
+            text += f"{badge}🆔 {order_id} | 📞 {phone} | 💰 {total} | {status}\n"
             kb.append([InlineKeyboardButton(
-                f"#{r[0]} — {r[1]} ({r[2]} so'm)",
-                callback_data=f"adm_order_{r[0]}"
+                f"{badge}#{order_id} — {phone} ({total} so'm)",
+                callback_data=f"adm_order_{order_id}"
             )])
         kb.append([InlineKeyboardButton("🔙 Orqaga", callback_data="adm_back_main")])
         await query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(kb))
@@ -3390,6 +3418,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not row:
             await query.answer("Topilmadi", show_alert=True)
             return
+
+        # 🔥 Ko'rilgan deb belgilaymiz
+        cur.execute("UPDATE shop_orders SET viewed=1 WHERE id=%s", (order_id,))
+        conn.commit()
+
         uid, cart_json, phone, total, status = row
         cart = json.loads(cart_json)
         items_text = ""
@@ -4614,6 +4647,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             loc = "\n📍 Lokatsiya yuborilmadi"
 
         text_admin = (
+            f"🆕 YANGI BUYURTMA #{order_id}\n"
             f"🚚 DASTAVKA\n"
             f"📞 {phone}\n"
             f"💰 {data['total']}{loc}"
@@ -4631,6 +4665,7 @@ async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pickup_addr_text = "Adminlar tomonidan aytiladi"
 
         text_admin = (
+            f"🆕 YANGI BUYURTMA #{order_id}\n"
             f"📍 OLIB KETISH\n"
             f"📞 {phone}\n"
             f"💰 {data['total']}\n"
