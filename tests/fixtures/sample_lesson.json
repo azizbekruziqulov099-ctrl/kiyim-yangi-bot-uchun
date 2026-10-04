@@ -1,0 +1,69 @@
+{
+  "title": "Bog‘dagi hosil",
+  "summary": "O‘quvchilar kuzgi bog‘dagi hosil haqidagi bitta vaziyat orqali rasm asosida gap tuzishni va 10 ichida qo‘shish-ayirishni mashq qiladi.",
+  "objectives": {
+    "subject_a": [
+      "Rasm asosida mazmunli gap tuzish va gap oxiriga tinish belgisini to‘g‘ri qo‘yish",
+      "Matematik masala javobini to‘liq gap bilan yozish"
+    ],
+    "subject_b": [
+      "10 ichida qo‘shish va ayirishni mustahkamlash",
+      "Rasm bo‘yicha sodda masala tuzish va yechish"
+    ],
+    "tarbiyaviy": [
+      "Mehnatni qadrlash, hosilni ehtiyot qilishga o‘rgatish"
+    ]
+  },
+  "teacher_info": "Kuz — hosil yig‘im-terimi fasli. O‘zbekiston bog‘larida olma, nok, uzum, anor kabi mevalar pishadi. Mevalar savat yoki yashiklarga terib olinadi, saralanadi va qishga saqlanadi. Dars davomida bitta vaziyat — Aziz va Malikaning bog‘dan olma terishi — orqali o‘quvchilar ham gap tuzadi, ham hisoblaydi. Ona tili qismida gapning bosh harf bilan boshlanib, nuqta bilan tugashi, so‘zlarning gapda bog‘lanishi takrorlanadi. Matematika qismida 10 ichida qo‘shish va ayirish, “jami”, “ko‘p”, “kam” tushunchalari ishlatiladi.",
+  "key_points": [
+    "Kuzda bog‘da mevalar pishadi va teriladi",
+    "Gap bosh harf bilan boshlanadi, oxiriga nuqta qo‘yiladi",
+    "Jamini topish uchun qo‘shamiz: 6 + 4 = 10",
+    "Qancha ko‘pligini topish uchun ayiramiz: 6 − 4 = 2"
+  ],
+  "child_text": "Kuz keldi. Bog‘da olmalar pishdi. Aziz va Malika bog‘dan olma terishdi. Aziz birinchi savatga 6 ta olma soldi. Malika ikkinchi savatga 4 ta olma soldi. Bolalar hosildan xursand bo‘lishdi.",
+  "integration": {
+    "idea": "Bitta vaziyat — bog‘dan olma terish — ikkala fanga xizmat qiladi: bolalar rasmni kuzatib gap tuzadi va o‘sha rasmdagi olmalarni sanab, hisoblaydi.",
+    "subject_a_part": "Rasm asosida gap tuzish, gapni to‘g‘ri yozish, masala javobini to‘liq gap bilan ifodalash.",
+    "subject_b_part": "Savatlardagi olmalarni sanash, qo‘shish va ayirish, taqqoslash (ko‘p, kam, teng)."
+  },
+  "vocabulary": [
+    {"word": "hosil", "meaning": "dalada yoki bog‘da yetishtirilgan meva va sabzavotlar"},
+    {"word": "savat", "meaning": "meva solinadigan to‘qilgan idish"},
+    {"word": "termoq", "meaning": "mevani daraxtdan uzib olmoq"}
+  ],
+  "materials": ["Dars rasmi (proyektor yoki chop etilgan)", "Hisob kartasi", "Daftar va rangli qalamlar", "Olma rasmli kartochkalar"],
+  "image": {
+    "scene_en": "A sunny autumn orchard in Uzbekistan. A boy (Aziz) and a girl (Malika) stand between two wicker baskets on the grass under an apple tree. The left basket holds red apples, the right basket holds red apples. Simple background with a few trees and a blue sky.",
+    "description_uz": "Kuzgi bog‘. Aziz va Malika ikkita savat yonida turibdi: chap savatda va o‘ng savatda qizil olmalar bor.",
+    "count_groups": [
+      {"label": "1-savat", "where_en": "in the left basket", "object_key": "apple", "object_uz": "olma", "count": 6},
+      {"label": "2-savat", "where_en": "in the right basket", "object_key": "apple", "object_uz": "olma", "count": 4}
+    ],
+    "questions": [
+      "Rasmda kimlarni ko‘ryapsiz?",
+      "Qaysi savatda olma ko‘p?",
+      "Rasm haqida ikkita gap tuzing."
+    ]
+  },
+  "tasks": [
+    {"title": "Kuzat va ayt", "subjects": "Ona tili + Matematika", "instruction": "Rasmni kuzating. Har bir savatdagi olmalarni sanang va ular haqida bittadan gap ayting.", "uses_image": true, "answer": "Birinchi savatda 6 ta olma bor. Ikkinchi savatda 4 ta olma bor.", "check_expression": "", "check_result": ""},
+    {"title": "Jamini top", "subjects": "Ona tili + Matematika", "instruction": "Ikkala savatda jami nechta olma borligini hisoblang. Javobni to‘liq gap bilan yozing.", "uses_image": true, "answer": "6 + 4 = 10. Ikkala savatda jami 10 ta olma bor.", "check_expression": "6+4", "check_result": "10"},
+    {"title": "Taqqosla", "subjects": "Ona tili + Matematika", "instruction": "Qaysi savatda olma ko‘p? Nechta ko‘p? «ko‘p» so‘zini ishlatib gap tuzing.", "uses_image": true, "answer": "Birinchi savatda olma 2 ta ko‘p: 6 − 4 = 2.", "check_expression": "6-4", "check_result": "2"},
+    {"title": "Masala tuz", "subjects": "Ona tili + Matematika", "instruction": "Malika o‘z savatidan 1 ta olmani buvisiga berdi. Shu haqida masala tuzing va yeching.", "uses_image": false, "answer": "Malikaning savatida 4 − 1 = 3 ta olma qoldi.", "check_expression": "4-1", "check_result": "3"},
+    {"title": "Gapni to‘ldir", "subjects": "Ona tili + Matematika", "instruction": "Nuqtalar o‘rniga mos son va so‘zni yozing: Aziz ... ta olma terdi. Malika ... ta olma terdi. Ular jami ... ta olma terishdi.", "uses_image": false, "answer": "6, 4, 10", "check_expression": "6+4", "check_result": "11"},
+    {"title": "Juftlikda ishlang", "subjects": "Ona tili + Matematika", "instruction": "Sherigingiz bilan olma kartochkalaridan 10 tasini ikki savatga turlicha bo‘ling. Har bir bo‘lish uchun misol va bitta gap yozing.", "uses_image": false, "answer": "Masalan: 7 + 3 = 10, 5 + 5 = 10. «Birinchi savatda 7 ta, ikkinchisida 3 ta olma bor.»", "check_expression": "", "check_result": ""}
+  ],
+  "lesson_plan": [
+    {"stage": "Tashkiliy qism", "minutes": 2, "teacher": "Salomlashadi, darsga tayyorlikni tekshiradi.", "students": "Darsga tayyorlanadi."},
+    {"stage": "Motivatsiya", "minutes": 5, "teacher": "Kuz haqida topishmoq aytadi, dars rasmini ko‘rsatadi.", "students": "Topishmoqni topadi, rasmni kuzatadi."},
+    {"stage": "Yangi mavzu", "minutes": 13, "teacher": "Matnni o‘qib beradi, 1–3-topshiriqlarni rasm bilan bajartiradi.", "students": "Gap tuzadi, olmalarni sanaydi va hisoblaydi."},
+    {"stage": "Mustahkamlash", "minutes": 15, "teacher": "4–5-topshiriqlarni beradi, javoblarni to‘liq gap bilan yozishni talab qiladi.", "students": "Masala tuzadi, gaplarni to‘ldiradi."},
+    {"stage": "Baholash va refleksiya", "minutes": 7, "teacher": "6-topshiriqni juftlikda bajartiradi, natijalarni muhokama qiladi.", "students": "Juftlikda ishlaydi, fikrini aytadi."},
+    {"stage": "Uyga vazifa", "minutes": 2, "teacher": "Uyga vazifani tushuntiradi.", "students": "Vazifani yozib oladi."}
+  ],
+  "assessment": ["Gapni bosh harf bilan boshlab, nuqta bilan tugatadi", "10 ichida qo‘shish va ayirishni to‘g‘ri bajaradi", "Javobni to‘liq gap bilan yozadi"],
+  "differentiation": {"support": "Olmalarni kartochkalar yordamida sanaydi, tayyor gap qolipidan foydalanadi.", "challenge": "Uch savat haqida masala tuzadi va yechadi."},
+  "homework": "Uyingizdagi mevalarni sanang va ular haqida 3 ta gap hamda 1 ta misol yozing.",
+  "voice_text": "Salom, bolalar! Kuz keldi. Bog‘da olmalar pishdi. Aziz va Malika bog‘dan olma terishdi. Aziz birinchi savatga oltita olma soldi. Malika ikkinchi savatga to‘rtta olma soldi. Bolalar hosildan xursand bo‘lishdi. Keling, olmalarni birga sanaymiz!"
+}
