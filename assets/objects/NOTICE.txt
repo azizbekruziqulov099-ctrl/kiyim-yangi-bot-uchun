@@ -1,0 +1,4 @@
+Bu papkadagi rasmlar (PNG) Google "Noto Emoji" to'plamidan olingan.
+Muallif: Google Inc. — https://github.com/googlefonts/noto-emoji
+Litsenziya: Apache License 2.0 (LICENSE-Apache-2.0.txt faylida).
+O'zgartirish: SVG fayllar PNG ga aylantirildi, chetlari kesildi va 144x144 o'lchamga keltirildi.
