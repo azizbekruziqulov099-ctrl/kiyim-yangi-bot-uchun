@@ -41,9 +41,16 @@ def pairs() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def topics(ready: list[tuple[int, str]], suggestions: list[str]) -> InlineKeyboardMarkup:
-    """ready: miyadagi tayyor darslar [(id, mavzu)]; suggestions: tayyor dars bo‘lmasa — AI uchun tavsiyalar."""
-    rows = [[B(f"📗 {title}", callback_data=f"w:c:{cid}")] for cid, title in ready]
+BTN_OWN_TOPIC = "✍️ Mavzuni o‘zim yozaman (AI)"
+
+
+def topics(ready: list[tuple[int, str]], suggestions: list[str], ai_ready: bool = False) -> InlineKeyboardMarkup:
+    """ready: miyadagi tayyor darslar [(id, mavzu)]; suggestions: tayyor dars bo‘lmasa — AI uchun tavsiyalar.
+    ai_ready: AI ulangan bo‘lsa — «Mavzuni o‘zim yozaman» tugmasi qo‘shiladi."""
+    rows = []
+    if ai_ready:
+        rows.append([B(BTN_OWN_TOPIC, callback_data="w:own")])
+    rows += [[B(f"📗 {title}", callback_data=f"w:c:{cid}")] for cid, title in ready]
     if not ready:
         row = []
         for i, topic in enumerate(suggestions):
@@ -71,10 +78,15 @@ def confirm(wiz: dict, images_enabled: bool) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
+def own_topic_prompt() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([_cancel_row("w:back:topic")])
+
+
 def ready_or_ai(catalog_id: int, ai_ready: bool) -> InlineKeyboardMarkup:
     rows = [[B("📗 Tayyor darsni ochish", callback_data=f"w:c:{catalog_id}")]]
     if ai_ready:
         rows.append([B("🤖 Baribir AI bilan yangi dars", callback_data="w:ai")])
+    rows.append(_cancel_row("w:back:topic"))
     return InlineKeyboardMarkup(rows)
 
 

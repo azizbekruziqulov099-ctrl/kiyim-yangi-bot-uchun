@@ -410,3 +410,47 @@ async def test_gemini_provider_flow(tmp_path, seeded_db, sample_lesson, monkeypa
     assert lesson_body["generationConfig"]["responseMimeType"] == "application/json"
     await app.shutdown()
     await ai.close()
+
+
+async def test_own_topic_button_ai_flow(bot):
+    """Sinf → juftlik → «✍️ Mavzuni o‘zim yozaman» → mavzu yoziladi → AI dars tayyorlaydi."""
+    tg, send = bot["tg"], bot["send"]
+    await send(text_update(TEACHER, "📚 Dars tayyorlash"))
+    await send(callback_update(TEACHER, "w:g:2"))
+    await send(callback_update(TEACHER, "w:p:ona_mat"))
+    params, _ = tg.last("editMessageText")
+    buttons = markup_buttons(params)
+    assert buttons[0][1] == "w:own", buttons            # tugma eng tepada
+    assert any(d and d.startswith("w:c:") for _, d in buttons)  # tayyor darslar ham bor
+    await send(callback_update(TEACHER, "w:own"))
+    params, _ = tg.last("editMessageText")
+    assert "Mavzuni yozing" in params["text"]
+    assert "w:back:topic" in [d for _, d in markup_buttons(params)]
+    await send(text_update(TEACHER, "Kosmosga sayohat"))
+    params, _ = tg.last("sendMessage")
+    assert "Kosmosga sayohat" in params["text"] and "tekshirib oling" in params["text"]
+    tg.clear()
+    await send(callback_update(TEACHER, find_cb(params, "w:go")))
+    await bot["settle"]()
+    assert any(c[1].startswith("/v1/") for c in bot["state"]["calls"]), "AI chaqirilmadi"
+    final, _ = tg.last("sendMessage")
+    assert "Dars tayyor" in final["text"] or tg.methods().count("sendMessage") >= 2
+
+
+async def test_own_topic_exact_match_offers_choice(bot):
+    """O‘zim yozaman orqali tayyor dars nomini yozsa — avtomatik ochilmaydi, tanlov beriladi."""
+    tg, send = bot["tg"], bot["send"]
+    await send(text_update(TEACHER, "📚 Dars tayyorlash"))
+    await send(callback_update(TEACHER, "w:g:1"))
+    await send(callback_update(TEACHER, "w:p:ona_mat"))
+    await send(callback_update(TEACHER, "w:own"))
+    await send(text_update(TEACHER, "Bog‘dagi hosil"))
+    params, _ = tg.last("sendMessage")
+    datas = [d for _, d in markup_buttons(params)]
+    assert "w:ai" in datas and any(d and d.startswith("w:c:") for d in datas)
+
+
+async def test_own_topic_hidden_without_ai(tmp_path, seeded_db):
+    from edu import keyboards as kb
+    markup = kb.topics([(1, "A")], [], ai_ready=False)
+    assert all(b.callback_data != "w:own" for row in markup.inline_keyboard for b in row)

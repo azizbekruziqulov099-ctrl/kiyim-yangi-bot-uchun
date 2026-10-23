@@ -57,7 +57,8 @@ HELP_SECTIONS = {
     "ai": (
         "🤖 <b>AI bilan yangi dars</b>\n\n"
         "Ro‘yxatda yo‘q mavzu kerak bo‘lsa:\n"
-        "1. Sinf va juftlikni tanlang, mavzuni yozib yuboring (yoki 🎤 ovozli xabar bilan ayting).\n"
+        "1. Sinf va juftlikni tanlang, «✍️ Mavzuni o‘zim yozaman (AI)» tugmasini bosing va mavzuni yozib yuboring "
+        "(yoki 🎤 ovozli xabar bilan ayting).\n"
         "2. Dars vaqti (45 yoki 90 daqiqa), AI rasm va qo‘shimcha istakni belgilang.\n"
         "3. «🚀 Darsni tayyorlash» — 1–2 daqiqada tayyor bo‘ladi.\n\n"
         "• Kunlik limit (bir kishi uchun): {lessons} ta dars, {images} ta rasm.\n"
@@ -259,11 +260,19 @@ def _topic_view(context: ContextTypes.DEFAULT_TYPE, wiz: dict):
     if ready:
         lines.append(f"📗 <b>Tayyor darslar ({len(ready)} ta)</b> — darhol ochiladi.")
     if cfg.ai_ready:
-        lines.append("✍️ Yoki o‘z mavzuingizni yozib yuboring (🎤 ovozli xabar ham bo‘ladi) — AI yangi dars "
-                     "tayyorlaydi.")
+        lines.append(f"✍️ Ro‘yxatda kerakli mavzu bo‘lmasa — <b>«{kb.BTN_OWN_TOPIC}»</b> tugmasini bosing: "
+                     "mavzuni yozasiz (yoki 🎤 ovozli aytasiz), AI esa shu ikki fanni bog‘lab dars yozib beradi.")
     elif not ready:
         lines.append("Bu juftlik va sinf uchun hozircha tayyor dars yo‘q.")
-    return "\n".join(lines), kb.topics(ready, suggestions)
+    return "\n".join(lines), kb.topics(ready, suggestions, cfg.ai_ready)
+
+
+def _own_topic_text(wiz: dict) -> str:
+    examples = subjects.TOPIC_SUGGESTIONS.get(wiz["pair"], [])[:3]
+    hint = ("\n\n<i>Masalan: " + "; ".join(L.h(t) for t in examples) + "</i>") if examples else ""
+    return (f"✍️ <b>Mavzuni yozing</b>\n🏫 {wiz['grade']}-sinf · {L.h(subjects.pair_label(wiz['pair']))}\n\n"
+            "Mavzuni xabar qilib yuboring (3–150 belgi) yoki 🎤 ovozli xabar bilan ayting. "
+            "AI shu mavzu bo‘yicha ikki fanni bog‘lab dars ishlanmasini yozib beradi." + hint)
 
 
 async def _show(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, markup) -> None:
@@ -384,6 +393,12 @@ async def wizard_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         wiz.update(step="topic", await_text="topic")
         text, markup = _topic_view(context, wiz)
         await _show(update, context, text, markup)
+    elif data == "w:own":
+        if not cfg.ai_ready or not wiz.get("pair"):
+            await query.answer("AI hozircha ulanmagan — tayyor mavzulardan tanlang.", show_alert=True)
+            return
+        wiz.update(step="own", await_text="topic", own=True, topic="")
+        await _show(update, context, _own_topic_text(wiz), kb.own_topic_prompt())
     elif data.startswith("w:t:"):
         items = subjects.TOPIC_SUGGESTIONS.get(wiz.get("pair", ""), [])
         idx = int(data.split(":")[2])
@@ -423,7 +438,7 @@ async def wizard_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await _show(update, context, f"🏫 {wiz.get('grade', '')}-sinf\n\n<b>2/3 · Fanlar juftligini tanlang</b>",
                         kb.pairs())
         elif target == "topic" and wiz.get("pair"):
-            wiz.update(step="topic", await_text="topic", topic="")
+            wiz.update(step="topic", await_text="topic", topic="", own=False)
             text, markup = _topic_view(context, wiz)
             await _show(update, context, text, markup)
         elif target == "confirm":
@@ -451,7 +466,8 @@ async def _route_topic(update: Update, context: ContextTypes.DEFAULT_TYPE, topic
     wiz = context.user_data["wiz"]
     wiz["topic"] = topic
     match = _match_catalog(db, wiz["grade"], wiz["pair"], topic)
-    if match and miya.topic_key(match[1]) == miya.topic_key(topic):
+    # «Mavzuni o‘zim yozaman» tanlangan bo‘lsa, tayyor dars avtomatik ochilmaydi — tanlov beriladi
+    if match and miya.topic_key(match[1]) == miya.topic_key(topic) and not wiz.get("own"):
         await open_ready(update, context, match[0])
         return
     if match:
