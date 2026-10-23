@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 COMMANDS = [
     BotCommand("start", "Bosh menyu"),
     BotCommand("dars", "Dars tayyorlash"),
+    BotCommand("rasm", "AI bilan rasm chizish (uslub tanlab)"),
     BotCommand("darslar", "AI bilan tayyorlangan darslarim"),
     BotCommand("yordam", "Yordam"),
     BotCommand("bekor", "Joriy amalni bekor qilish"),
@@ -88,6 +89,7 @@ def build_application(cfg: Config, db: Database | None = None, ai: AIService | N
     app.add_handler(CommandHandler("start", handlers.start))
     app.add_handler(CommandHandler(["dars", "new"], handlers.new_lesson))
     app.add_handler(CommandHandler("darslar", handlers.archive))
+    app.add_handler(CommandHandler(["rasm", "draw"], handlers.draw_cmd))
     app.add_handler(CommandHandler(["yordam", "help"], handlers.help_cmd))
     app.add_handler(CommandHandler(["bekor", "cancel"], handlers.cancel_cmd))
     app.add_handler(CommandHandler("admin", admin.admin_cmd))
@@ -98,6 +100,7 @@ def build_application(cfg: Config, db: Database | None = None, ai: AIService | N
     app.add_handler(CommandHandler("unblock", admin.unblock_cmd))
 
     app.add_handler(CallbackQueryHandler(handlers.wizard_cb, pattern=r"^w:"))
+    app.add_handler(CallbackQueryHandler(handlers.draw_cb, pattern=r"^d:"))
     app.add_handler(CallbackQueryHandler(handlers.action_cb, pattern=r"^x:"))
     app.add_handler(CallbackQueryHandler(handlers.archive_cb, pattern=r"^a:"))
     app.add_handler(CallbackQueryHandler(handlers.help_cb, pattern=r"^h:"))

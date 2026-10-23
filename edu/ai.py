@@ -344,12 +344,14 @@ class OpenAIProvider(Provider):
             raise AIError(f"incomplete: {reason}", kind="incomplete")
         return parse_json_loose(self._output_text(data))
 
-    async def generate_image(self, model: str, prompt: str) -> bytes:
+    _SIZES = {"3:2": "1536x1024", "2:3": "1024x1536", "1:1": "1024x1024"}
+
+    async def generate_image(self, model: str, prompt: str, aspect: str = "3:2") -> bytes:
         body = {
             "model": model,
             "prompt": prompt,
             "n": 1,
-            "size": "1536x1024",
+            "size": self._SIZES.get(aspect, "1536x1024"),
             "quality": self.cfg.image_quality,
             "output_format": "jpeg",
             "output_compression": 90,
@@ -513,12 +515,12 @@ class GeminiProvider(Provider):
         data = await self._post_degrading(url, body, self._JSON_OPTIONAL)
         return parse_json_loose(self._text(data))
 
-    async def generate_image(self, model: str, prompt: str) -> bytes:
+    async def generate_image(self, model: str, prompt: str, aspect: str = "3:2") -> bytes:
         body = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
             "generationConfig": {
                 "responseModalities": ["TEXT", "IMAGE"],
-                "imageConfig": {"aspectRatio": "3:2"},
+                "imageConfig": {"aspectRatio": aspect if aspect in ("3:2", "2:3", "1:1") else "3:2"},
             },
         }
         optional = {"generationConfig.imageConfig": ("imageConfig", "image_config", "aspect")}
@@ -635,8 +637,14 @@ class AIService:
                 raise
         return await self._run("text", call)
 
-    async def image(self, prompt: str) -> tuple[bytes, str]:
-        return await self._run("image", lambda p, m: p.generate_image(m, prompt))
+    async def image(self, prompt: str, aspect: str = "3:2") -> tuple[bytes, str]:
+        return await self._run("image", lambda p, m: p.generate_image(m, prompt, aspect))
+
+    async def image_prompt_en(self, system: str, user: str, schema: dict) -> dict:
+        """O‘zbekcha tavsifni rasm modeli uchun inglizcha promptga aylantiradi (kichik matn so‘rovi)."""
+        result, _ = await self._run("text", lambda p, m: p.generate_json(m, system, user, schema, 4000,
+                                                                          name="image_prompt"), max_models=2)
+        return result
 
     async def check_image(self, prompt: str, image: bytes, schema: dict) -> dict | None:
         """Rasmdagi sonlarni tekshiradi. Ishlamasa None (dars baribir tayyor bo‘ladi)."""

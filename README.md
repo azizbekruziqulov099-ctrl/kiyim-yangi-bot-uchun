@@ -13,6 +13,8 @@ O‘qish + Texnologiya.
 - **📗 Miya — 216 ta tayyor dars** (9 juftlik × 6 mavzu × 4 sinf). AI’siz, bepul, darhol ochiladi.
   Fayl: `data/Fanlar_Miya.xlsx`. Bot har ishga tushganda faylni tekshiradi va o‘zgargan bo‘lsa bazaga yozadi.
 - **🤖 AI dars** — ro‘yxatda yo‘q mavzu uchun (OpenAI yoki Gemini, model avtomatik tanlanadi).
+- **🎨 Rasm chizish** — darsdan alohida: uslub tanlanadi (multfilm, 3D, akvarel, bo‘yash uchun kontur, milliy uslub va h.k.), format (yotiq/tik/kvadrat), tavsif yoziladi yoki ovoz bilan aytiladi. `/rasm`.
+- **✍️ Mavzuni o‘zim yozaman** — sinf va juftlikdan keyin o‘z mavzusini yozib, AI bilan dars olish.
 - **🧮 Ko‘rgazma kartasi** — bot o‘zi chizadi: «6 ta olma» → aniq 6 ta olma rasmi; o‘lchovlar → diagramma.
 - **🎨 AI rasm** — ixtiyoriy; sonlari tekshiriladi; tayyor dars rasmi bir marta chizilib, hammaga bepul ko‘rinadi.
 - **✅ Javoblar** — hisoblar bot tomonidan qayta tekshiriladi (`6+4=10` ✅).
@@ -43,7 +45,7 @@ Kompyuterda sinash: `pip install -r requirements.txt`, so‘ng `TOKEN=... ADMIN_
 
 | Kimga | Buyruq |
 | --- | --- |
-| Hamma | `/start`, `/dars`, `/darslar`, `/yordam`, `/bekor` |
+| Hamma | `/start`, `/dars`, `/rasm`, `/darslar`, `/yordam`, `/bekor` |
 | Admin | `/admin`, `/stat`, `/miya_import`, `/miya_export`, `/block <id>`, `/unblock <id>` |
 
 ## Tuzilma
@@ -53,6 +55,7 @@ main.py                 — ishga tushirish
 edu/app.py              — handlerlarni ulash, miyani yuklash
 edu/handlers.py         — foydalanuvchi bosqichlari, tayyor/AI dars, ovoz, yordam
 edu/admin.py            — admin panel
+edu/drawing.py          — 🎨 alohida rasm chizish (uslub, format, qayta chizish)
 edu/pipeline.py         — dars va rasm tayyorlash jarayoni (orqa fonda)
 edu/miya.py             — Excel ↔ baza (miya)
 edu/ai.py, prompts.py   — OpenAI / Gemini, ko‘rsatmalar

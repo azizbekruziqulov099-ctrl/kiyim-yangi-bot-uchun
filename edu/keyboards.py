@@ -7,13 +7,14 @@ from telegram import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from . import subjects
 
 BTN_NEW = "📚 Dars tayyorlash"
+BTN_DRAW = "🎨 Rasm chizish"
 BTN_ARCHIVE = "🗂 Mening darslarim"
 BTN_HELP = "ℹ️ Yordam"
 BTN_ADMIN = "👑 Admin panel"
 
 
 def main_menu(is_admin: bool = False) -> ReplyKeyboardMarkup:
-    rows = [[BTN_NEW], [BTN_ARCHIVE, BTN_HELP]]
+    rows = [[BTN_NEW, BTN_DRAW], [BTN_ARCHIVE, BTN_HELP]]
     if is_admin:
         rows.append([BTN_ADMIN])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True, input_field_placeholder="Mavzu yozing yoki tugmani bosing…")

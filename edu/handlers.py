@@ -10,7 +10,7 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest, TelegramError
 from telegram.ext import ContextTypes
 
-from . import docx_export, miya, pipeline, settings, subjects, tts
+from . import docx_export, drawing, miya, pipeline, settings, subjects, tts
 from . import keyboards as kb
 from . import lesson as L
 from .ai import AIError
@@ -28,7 +28,8 @@ WELCOME = (
     "🧮 aniq ko‘rgazma kartasi, 🖼 mavzuga mos rasm\n"
     "✍️ topshiriqlar va ✅ javoblar, 🧑‍🏫 dars rejasi\n"
     "📄 Word fayl (dars ishlanmasi) va 🔊 ovozli o‘qish\n"
-    "{ai_line}\n"
+    "{ai_line}"
+    "{draw_line}\n"
     "Boshlash uchun <b>«📚 Dars tayyorlash»</b> tugmasini bosing yoki mavzuni yozib yuboring."
 )
 
@@ -90,6 +91,17 @@ HELP_SECTIONS = {
         "farq qilishi mumkin; bot tekshirib, izohda yozadi. Sanash uchun kartadan foydalaning.\n"
         "• Tayyor dars uchun chizilgan rasm saqlanadi — keyingi o‘qituvchilar uni darhol oladi."
     ),
+    "draw": (
+        "🎨 <b>Rasm chizish</b> (darsdan alohida)\n\n"
+        "1. Menyudagi «🎨 Rasm chizish» tugmasini bosing (yoki /rasm).\n"
+        "2. Uslubni tanlang: multfilm, 3D multfilm, kitob illyustratsiyasi, akvarel, rangli qalam, "
+        "bo‘yash uchun kontur, ko‘rgazma/plakat, milliy uslub, anime yoki realistik.\n"
+        "3. Formatni belgilang (yotiq, tik A4 yoki kvadrat) va nimani chizishni yozing yoki 🎤 ovoz bilan ayting.\n\n"
+        "• Rasm 30–90 soniyada tayyor bo‘ladi; chop etish uchun to‘liq sifatli fayl ham yuboriladi.\n"
+        "• «🔁 Qayta chizish» — o‘sha tavsif bo‘yicha yangi variant; «🎨 Boshqa uslubda» — shu tavsifni boshqa "
+        "uslubda.\n"
+        "• Kunlik limit: {images} ta rasm (dars rasmlari bilan umumiy). Xato bo‘lsa limit hisobiga yozilmaydi."
+    ),
     "faq": (
         "❓ <b>Ko‘p so‘raladigan savollar</b>\n\n"
         "• <b>Tugma ishlamayapti?</b> /start ni bosing — menyu yangilanadi.\n"
@@ -98,7 +110,7 @@ HELP_SECTIONS = {
         "• <b>Material rasmiy darslikmi?</b> Yo‘q — mualliflik namunasi. Darsdan oldin sinfingizga moslab ko‘rib "
         "chiqing.\n"
         "• <b>Taklif yoki xato?</b> 👎 tugmasini bosing yoki admin bilan bog‘laning.\n\n"
-        "<b>Buyruqlar:</b> /dars — yangi dars · /darslar — mening darslarim · /bekor — bekor qilish · /yordam"
+        "<b>Buyruqlar:</b> /dars — yangi dars · /rasm — rasm chizish · /darslar — mening darslarim · /bekor — bekor qilish · /yordam"
     ),
     "admin": (
         "👑 <b>Admin uchun</b>\n\n"
@@ -115,7 +127,8 @@ HELP_SECTIONS = {
 HELP_BUTTONS = [
     [("📗 Tayyor darslar", "ready"), ("🤖 AI bilan dars", "ai")],
     [("✅ Javoblar va Word", "tools"), ("🔊 Ovoz", "voice")],
-    [("🖼 Kartalar va rasm", "pics"), ("❓ Savollar", "faq")],
+    [("🖼 Kartalar va rasm", "pics"), ("🎨 Rasm chizish", "draw")],
+    [("❓ Savollar", "faq")],
 ]
 
 ARCHIVE_PAGE = 8
@@ -152,7 +165,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     ai_line = ("🤖 Ro‘yxatda yo‘q mavzu bo‘lsa — AI yangi dars tayyorlaydi\n" if cfg.ai_ready else "")
     await update.effective_message.reply_text(
-        WELCOME.format(name=L.h(user.first_name or "ustoz"), ready=db.count_catalog(), ai_line=ai_line),
+        WELCOME.format(name=L.h(user.first_name or "ustoz"), ready=db.count_catalog(), ai_line=ai_line,
+                       draw_line=("🎨 «Rasm chizish» — istalgan uslubda (multfilm, akvarel, bo‘yash uchun kontur…) "
+                                  "AI rasm chizadi\n" if cfg.ai_ready else "")),
         parse_mode=HTML, reply_markup=kb.main_menu(cfg.is_admin(user.id)),
     )
     if cfg.is_admin(user.id) and not cfg.ai_ready:
@@ -180,7 +195,7 @@ def _help_section(context: ContextTypes.DEFAULT_TYPE, key: str) -> str:
     text = HELP_SECTIONS[key].format(
         ready=db.count_catalog(), pairs=pairs, lessons=settings.daily_lessons(db, cfg),
         images=settings.daily_images(db, cfg), voice_ai="" if cfg.ai_ready else " (AI ulanganda ishlaydi)")
-    if key == "ai" and not cfg.ai_ready:
+    if key in ("ai", "draw") and not cfg.ai_ready:
         text += "\n\n<i>Hozircha AI ulanmagan — tayyor darslardan foydalaning.</i>"
     return text
 
@@ -217,7 +232,7 @@ async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not await guard(update, context):
         return
     cfg, _, _ = deps(context)
-    for key in ("wiz", "adm", "pending_topic", "miya_pending", "bc_ref"):
+    for key in ("wiz", "draw", "adm", "pending_topic", "miya_pending", "bc_ref"):
         context.user_data.pop(key, None)
     await update.effective_message.reply_text("Bekor qilindi.",
                                               reply_markup=kb.main_menu(cfg.is_admin(update.effective_user.id)))
@@ -306,6 +321,7 @@ async def new_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE, topic: 
     if not await guard(update, context):
         return
     await _hide_old_keyboard(context, update.effective_chat.id, context.user_data.get("wiz"))
+    context.user_data.pop("draw", None)
     context.user_data["wiz"] = {"step": "grade", "minutes": 45, "image": True, "extra": "", "topic": topic}
     head = f"📝 Mavzu: <b>«{L.h(topic)}»</b>\n\n" if topic else ""
     text = head + "<b>1/3 · Sinfni tanlang</b>\nDars qaysi sinf uchun?"
@@ -535,6 +551,8 @@ async def handle_free_text(update: Update, context: ContextTypes.DEFAULT_TYPE, t
     cfg, db, _ = deps(context)
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
+    if await drawing.handle_text(update, context, text):
+        return
     wiz = context.user_data.get("wiz")
     topic = L.uz_fix(text)
 
@@ -599,6 +617,8 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     if text == kb.BTN_NEW:
         await new_lesson(update, context)
+    elif text == kb.BTN_DRAW:
+        await drawing.start(update, context)
     elif text == kb.BTN_ARCHIVE:
         await archive(update, context)
     elif text == kb.BTN_HELP:
@@ -681,6 +701,20 @@ async def other_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if update.effective_message:
         await update.effective_message.reply_text(
             "Mavzuni yozib yoki ovozli xabar bilan yuboring, yoki «📚 Dars tayyorlash» tugmasini bosing.")
+
+
+# ───────────────────────── 🎨 Rasm chizish ─────────────────────────
+
+async def draw_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await guard(update, context):
+        return
+    await drawing.start(update, context)
+
+
+async def draw_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await guard(update, context):
+        return
+    await drawing.callback(update, context)
 
 
 # ───────────────────────── AI darslar arxivi ─────────────────────────

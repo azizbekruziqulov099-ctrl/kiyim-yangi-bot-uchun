@@ -454,3 +454,77 @@ async def test_own_topic_hidden_without_ai(tmp_path, seeded_db):
     from edu import keyboards as kb
     markup = kb.topics([(1, "A")], [], ai_ready=False)
     assert all(b.callback_data != "w:own" for row in markup.inline_keyboard for b in row)
+
+
+async def test_draw_flow_style_aspect_and_redraw(bot):
+    """🎨 Rasm chizish: uslub → format → tavsif → rasm; qayta chizish va boshqa uslub."""
+    tg, send, state = bot["tg"], bot["send"], bot["state"]
+    await send(text_update(TEACHER, "/start"))
+    params, _ = tg.last("sendMessage")
+    assert any(t == "🎨 Rasm chizish" for t, _ in markup_buttons(params))
+    await send(text_update(TEACHER, "🎨 Rasm chizish"))
+    params, _ = tg.last("sendMessage")
+    assert "uslubni tanlang" in params["text"]
+    datas = [d for _, d in markup_buttons(params)]
+    assert "d:s:coloring" in datas and "d:s:watercolor" in datas
+    await send(callback_update(TEACHER, "d:s:coloring"))
+    params, _ = tg.last("editMessageText")
+    assert "Nimani chizay" in params["text"]
+    assert "✅ 📄 Tik (A4)" in [t for t, _ in markup_buttons(params)]   # bo‘yash uchun — standart tik
+    await send(callback_update(TEACHER, "d:a:1:1"))
+    tg.clear()
+    await send(text_update(TEACHER, "bog‘da olma terayotgan qizcha"))
+    await bot["settle"]()
+    body = state["image_bodies"][-1]
+    assert body["size"] == "1024x1024"
+    assert "colouring page" in body["prompt"] and "olma terayotgan" in body["prompt"]  # tarjima bo‘lmasa — asl matn
+    photo, _ = tg.last("sendPhoto")
+    assert "Bo‘yash uchun" in photo["caption"]
+    assert "d:again" in [d for _, d in markup_buttons(photo)]
+    assert tg.methods().count("sendDocument") == 1
+    assert bot["db"].usage_today(TEACHER)[1] == 1
+
+    # qayta chizish — o‘sha tavsif va uslub
+    await send(callback_update(TEACHER, "d:again"))
+    await bot["settle"]()
+    assert "colouring page" in state["image_bodies"][-1]["prompt"]
+    # limit (2 ta) tugadi
+    await send(callback_update(TEACHER, "d:again"))
+    params, _ = tg.last("sendMessage")
+    assert "limiti tugadi" in params["text"]
+
+
+async def test_draw_restyle_and_text_not_treated_as_topic(bot):
+    tg, send, state = bot["tg"], bot["send"], bot["state"]
+    await send(text_update(ADMIN, "/rasm"))
+    await send(callback_update(ADMIN, "d:s:watercolor"))
+    await send(text_update(ADMIN, "Qishki qishloq"))
+    await bot["settle"]()
+    assert "watercolour" in state["image_bodies"][-1]["prompt"]
+    await send(callback_update(ADMIN, "d:restyle"))
+    params, _ = tg.last("sendMessage")
+    assert "Boshqa uslubni" in params["text"]
+    await send(callback_update(ADMIN, "d:s:3d"))
+    await bot["settle"]()
+    body = state["image_bodies"][-1]
+    assert "3D animated" in body["prompt"] and body["size"] == "1536x1024"
+    # chizishdan keyin oddiy matn yana mavzu sifatida qabul qilinadi
+    tg.clear()
+    await send(text_update(ADMIN, "Bog‘dagi hosil"))
+    params, _ = tg.last("sendMessage")
+    assert "tayyor darslar topildi" in params["text"]
+
+
+async def test_draw_failure_refunds(bot):
+    tg, send, state = bot["tg"], bot["send"], bot["state"]
+    await send(text_update(TEACHER, "/rasm"))
+    await send(callback_update(TEACHER, "d:s:cartoon"))
+    state["fail_status"] = 400
+    state["fail_message"] = "Your request was rejected by the safety system"
+    state["fail_code"] = "moderation_blocked"
+    await send(text_update(TEACHER, "mushuk"))
+    await bot["settle"]()
+    state["fail_status"] = None
+    params, _ = tg.last("editMessageText")
+    assert "Rasm chizilmadi" in params["text"]
+    assert bot["db"].usage_today(TEACHER)[1] == 0
